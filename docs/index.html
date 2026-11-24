@@ -12,7 +12,7 @@
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 .wrap{max-width:860px;margin:0 auto;padding:12px 14px 40px}
-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0 12px;border-bottom:3px solid var(--hi);margin-bottom:14px}
+header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px;padding:6px 0 12px;border-bottom:3px solid var(--hi);margin-bottom:14px}
 h1{font-size:22px;margin:0;letter-spacing:-.01em}
 h2{font-size:16px;margin:0 0 10px}
 nav{display:flex;gap:6px}
@@ -51,7 +51,7 @@ input,textarea{width:100%;background:var(--sf);border:1px solid var(--ln);border
 <div class="wrap">
 <header>
   <h1>АвтоСмета</h1>
-  <nav><button id="t-calc" class="on">Расчёт</button><button id="t-admin">Администратор</button></nav>
+  <nav><button id="t-calc" class="on">Расчёт</button><button id="t-list" style="display:none">Сметы</button><button id="t-admin">Администратор</button></nav><div id="who" class="mu" style="width:100%;display:none"></div>
 </header>
 <main id="view"></main>
 <div id="receipt"></div>
@@ -105,18 +105,21 @@ const DEF=[
 ...L('Нормо-часы',[['Слесарные работы (нормо-час)',1500,'час'],['Электрические работы (нормо-час)',1800,'час'],['Кузовные работы (нормо-час)',1800,'час'],['Малярные работы (нормо-час)',2000,'час'],['Диагностические работы (нормо-час)',2000,'час']])
 ].map((x,i)=>({id:'s'+(i+1),...x}));
 const KEY='avtosmeta.v1';
-let sumOpen=false,aq='',S,sel={},extras=[],disc=0,q='',cat='',admin=false,tab='calc',cl={name:'',car:'',plate:''};
+/* Общая база (Firebase). Пока apiKey пуст, программа работает локально, как раньше.
+   masters: почты мастеров строчными буквами (для интерфейса; настоящая защита — в правилах Firestore). */
+const CLOUD={apiKey:'AIzaSyCODLzY_y3S9pXkPskhl8Mvs26CL1HwVs4',projectId:'avtosmeta-7ae9e',masters:['sasha-denk@mail.ru']};
+let snap={},curId=null,curMeta=null,U=null,listQ='',EST=[],sumOpen=false,aq='',S,sel={},extras=[],disc=0,q='',cat='',admin=false,tab='calc',cl={name:'',car:'',plate:''};
 function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
   if(!S||!Array.isArray(S.services))S={pin:'1234',services:DEF.map(x=>({...x}))};
   if(!S.v||S.v<2){const have=new Set(S.services.map(s=>s.name));DEF.forEach(d=>{if(!have.has(d.name))S.services.push({...d})});S.v=2;save()}}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(cloudOn()&&U&&isMaster())pushPriceSoon()}
 const cats=()=>[...new Set(S.services.map(s=>s.cat))];
 const uid=()=>'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
 
 /* ---------- Калькулятор ---------- */
 function calcShell(){
   $('#view').innerHTML=`
-  <div class="card"><h2>Клиент и автомобиль</h2><div class="grid">
+  ${banner()}<div class="card"><h2>Клиент и автомобиль</h2><div class="grid">
     <input id="c-name" placeholder="Имя клиента" value="${esc(cl.name)}">
     <input id="c-car" placeholder="Марка и модель" value="${esc(cl.car)}">
     <input id="c-plate" placeholder="Госномер" value="${esc(cl.plate)}"></div></div>
@@ -154,7 +157,7 @@ function drawEx(){
   $('#ex').onclick=e=>{const b=e.target.closest('button');if(!b)return;extras.splice(+b.dataset.i,1);drawEx();drawSum()};
 }
 function totals(){
-  const lines=S.services.filter(s=>sel[s.id]).map(s=>({n:s.name,k:sel[s.id],p:s.price,u:s.unit,t:s.price*sel[s.id]}));
+  const lines=currentLines();
   const work=lines.reduce((a,l)=>a+l.t,0),parts=extras.reduce((a,x)=>a+x.p*x.k,0);
   const d=Math.min(100,Math.max(0,disc)),dv=work*d/100;
   return{lines,work,parts,d,dv,total:work-dv+parts};
@@ -167,11 +170,12 @@ function drawSum(){
    <div class="tot"><span>Скидка на работы <input id="disc" type="number" min="0" max="100" value="${disc||''}" placeholder="0" style="width:70px;min-height:32px;padding:3px 6px"> %</span><span>−${fmt(t.dv)}</span></div>
    <div class="tot"><span>Запчасти и материалы</span><span>${fmt(t.parts)}</span></div>
    
-   <div class="btns"><button class="pri" id="b-copy">Скопировать смету</button><button id="b-print">Печать</button><button id="b-clear" class="dn">Очистить</button></div>
+   <div class="btns"><button class="pri" id="b-copy">Скопировать смету</button><button id="b-print">Печать</button><button id="b-clear" class="dn">Очистить</button>${cloudOn()?'<button class="pri" id="b-save">'+(curId?'Сохранить изменения':'Сохранить в базу')+'</button>':''}</div>
    <div class="btns"><span class="mu">Выгрузить:</span><button id="x-csv">CSV (Excel)</button><button id="x-txt">TXT</button><button id="x-html">HTML</button></div><div class="mu" id="xmsg"></div></div>`;
   $('#sum-head').onclick=()=>{sumOpen=!sumOpen;drawSum()};
+  if($('#b-save'))$('#b-save').onclick=saveEstimate;
   $('#disc').oninput=e=>{disc=parseFloat(e.target.value)||0;const pos=e.target.selectionStart;drawSum();const i=$('#disc');i.focus();try{i.setSelectionRange(pos,pos)}catch(_){}};
-  $('#b-clear').onclick=()=>{if(confirm('Очистить смету?')){sel={};extras=[];disc=0;calcShell()}};
+  $('#b-clear').onclick=()=>{if(confirm('Очистить смету?'))newEstimate()};
   $('#b-copy').onclick=async()=>{const txt=estimateText();
     try{await navigator.clipboard.writeText(txt);$('#b-copy').textContent='Скопировано ✓'}catch(e){prompt('Скопируйте смету:',txt)}};
   $('#b-print').onclick=()=>{drawReceipt();window.print()};
@@ -219,6 +223,7 @@ function receiptHTML(){drawReceipt();return '<!doctype html><html lang="ru"><met
 
 /* ---------- Администрирование ---------- */
 function adminView(){
+  if(cloudOn()){if(!isMaster()){$('#view').innerHTML='<div class="card"><h2>Только для мастера</h2><p class="mu">Прайс-лист правит мастер. Вы вошли как '+esc(U.email)+'.</p></div>';return}admin=true}
   if(!admin){
     $('#view').innerHTML=`<div class="card"><h2>Вход для администратора</h2>
       <p class="mu">PIN по умолчанию — 1234. Смените его после первого входа.</p>
@@ -262,12 +267,55 @@ function drawAdminList(){
     if(confirm('Удалить «'+s.name+'»?')){S.services=S.services.filter(x=>x.id!==id);delete sel[id];save();adminView()}};
 }
 
+/* ---------- Общая база: вход, сметы, история ---------- */
+const cloudOn=()=>!!(CLOUD.apiKey&&CLOUD.projectId);
+const isMaster=()=>!!U&&CLOUD.masters.map(x=>x.toLowerCase()).includes(String(U.email).toLowerCase());
+const FSB=()=>'https://firestore.googleapis.com/v1/projects/'+CLOUD.projectId+'/databases/(default)/documents';
+const F=o=>({fields:Object.fromEntries(Object.entries(o).map(([k,v])=>[k,typeof v==='number'?{doubleValue:v}:{stringValue:String(v)}]))});
+const P=d=>{const o={};for(const[k,v]of Object.entries(d.fields||{}))o[k]=v.stringValue!==undefined?v.stringValue:Number(v.doubleValue!==undefined?v.doubleValue:v.integerValue);o.id=d.name.split('/').pop();return o};
+function toast(m){const d=document.createElement('div');d.textContent=m;d.style.cssText='position:fixed;left:12px;right:12px;bottom:90px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:8px;z-index:9;text-align:center';document.body.appendChild(d);setTimeout(()=>d.remove(),3500)}
+async function authCall(url,body,form){const r=await fetch(url,{method:'POST',headers:{'Content-Type':form?'application/x-www-form-urlencoded':'application/json'},body});const j=await r.json();if(!r.ok)throw new Error(j.error&&j.error.message||r.status);return j}
+function setU(j){U={email:j.email||(U&&U.email)||'',idToken:j.idToken||j.id_token,refresh:j.refreshToken||j.refresh_token,exp:Date.now()+(Number(j.expiresIn||j.expires_in)-60)*1000};try{localStorage.setItem('avtosmeta.auth',JSON.stringify({email:U.email,refresh:U.refresh}))}catch(e){}}
+async function refreshTok(){setU(await authCall('https://securetoken.googleapis.com/v1/token?key='+CLOUD.apiKey,'grant_type=refresh_token&refresh_token='+encodeURIComponent(U.refresh),true))}
+async function restore(){try{const a=JSON.parse(localStorage.getItem('avtosmeta.auth'));if(!a||!a.refresh)return;U={email:a.email,refresh:a.refresh,exp:0};await refreshTok()}catch(e){U=null}}
+async function tok(){if(!U)throw new Error('Нет входа');if(Date.now()>U.exp)await refreshTok();return U.idToken}
+async function fs(method,path,body){const t=await tok();const r=await fetch(FSB()+path,{method,headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error?(e.error.status+': '+e.error.message):String(r.status))}return r.json()}
+let _pt;function pushPriceSoon(){clearTimeout(_pt);_pt=setTimeout(async()=>{try{await fs('PATCH','/config/price',F({services:JSON.stringify(S.services),updatedBy:U.email,updatedAt:new Date().toISOString()}))}catch(e){toast('Прайс не сохранён в базе: '+e.message)}},800)}
+async function pullPrice(){try{S.services=JSON.parse(P(await fs('GET','/config/price')).services);try{localStorage.setItem(KEY,JSON.stringify(S))}catch(_){}}catch(e){if(/NOT_FOUND/.test(e.message)&&isMaster())pushPriceSoon()}}
+function loginView(){$('#view').innerHTML='<div class="card"><h2>Вход</h2><div class="grid"><input id="l-e" type="email" placeholder="Почта" autocomplete="username"><input id="l-p" type="password" placeholder="Пароль" autocomplete="current-password"></div><div class="btns"><button class="pri" id="l-go">Войти</button></div><div class="mu" id="l-m"></div></div>';
+  const go=async()=>{try{$('#l-m').textContent='Входим…';const j=await authCall('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+CLOUD.apiKey,JSON.stringify({email:$('#l-e').value.trim(),password:$('#l-p').value,returnSecureToken:true}));U=null;setU(j);await pullPrice();renderWho();show('calc')}catch(e){U=null;$('#l-m').textContent=/CREDENTIALS|PASSWORD|EMAIL|INVALID/.test(e.message)?'Неверная почта или пароль.':'Не удалось войти: '+e.message}};
+  $('#l-go').onclick=go;$('#l-p').onkeydown=e=>{if(e.key==='Enter')go()}}
+function renderWho(){const w=$('#who');if(!cloudOn()||!U){w.style.display='none';return}w.style.display='';w.innerHTML=esc(U.email)+' · '+(isMaster()?'мастер':'сотрудник')+' <button id="t-out" style="min-height:30px;padding:2px 10px">Выйти</button>';$('#t-out').onclick=()=>{U=null;try{localStorage.removeItem('avtosmeta.auth')}catch(e){}renderWho();show('calc')}}
+async function boot(){if(cloudOn()){$('#t-list').style.display='';$('#t-list').onclick=()=>show('list');await restore();if(U)await pullPrice()}renderWho();show(location.hash==='#admin'?'admin':'calc')}
+function currentLines(){return Object.keys(sel).map(id=>{const s=snap[id]||S.services.find(x=>x.id===id);return s&&{id,n:s.name,k:sel[id],p:s.price,u:s.unit,t:s.price*sel[id]}}).filter(Boolean)}
+const banner=()=>curId?'<div class="card" style="border-color:var(--hi)">Редактируется смета № '+esc(curMeta.num)+' <button onclick="newEstimate()" style="margin-left:8px">Новая смета</button></div>':'';
+function newEstimate(){sel={};snap={};extras=[];disc=0;cl={name:'',car:'',plate:''};curId=null;curMeta=null;calcShell()}
+function genNum(){const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+Math.random().toString(36).slice(2,6).toUpperCase()}
+function summarize(o,n){if(!o)return 'Создана. Итого '+fmt(n.total);const a=JSON.parse(o.data),b=JSON.parse(n.data),nm=d=>Object.keys(d.sel).map(i=>((d.snap||{})[i]||{}).name+' ×'+d.sel[i]),A=nm(a),B=nm(b),add=B.filter(x=>!A.includes(x)),del=A.filter(x=>!B.includes(x));let s='Итого '+fmt(o.total)+' → '+fmt(n.total);if(add.length)s+='; добавлено: '+add.join(', ');if(del.length)s+='; убрано: '+del.join(', ');if(a.disc!==b.disc)s+='; скидка '+a.disc+'% → '+b.disc+'%';if(JSON.stringify(a.extras)!==JSON.stringify(b.extras))s+='; изменены запчасти';if(o.client!==n.client||o.car!==n.car||o.plate!==n.plate)s+='; изменены данные клиента/авто';return s}
+async function saveEstimate(){if(emptyCheck())return;const t=totals(),now=new Date().toISOString(),lines=currentLines(),sn={};lines.forEach(l=>sn[l.id]={name:l.n,price:l.p,unit:l.u});
+  const data=JSON.stringify({sel,snap:sn,extras,disc,cl}),isNew=!curId,id=curId||('e'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)),meta=curMeta||{num:genNum(),createdAt:now,createdBy:U.email};
+  const rec={num:meta.num,client:cl.name||'',car:cl.car||'',plate:cl.plate||'',total:Math.round(t.total*100)/100,createdAt:meta.createdAt,createdBy:meta.createdBy,updatedAt:now,updatedBy:U.email,data};
+  try{await fs('PATCH','/estimates/'+id,F(rec));await fs('POST','/estimates/'+id+'/history',F({at:now,by:U.email,action:isNew?'create':'edit',summary:summarize(isNew?null:curMeta.rec,rec),snapshot:data}));
+    curId=id;curMeta={num:meta.num,createdAt:meta.createdAt,createdBy:meta.createdBy,rec:{...rec,id}};snap=sn;toast('Смета № '+meta.num+' сохранена');calcShell()}catch(e){toast('Не сохранено: '+e.message)}}
+function openEstimate(r){const d=JSON.parse(r.data);sel=d.sel||{};snap=d.snap||{};extras=d.extras||[];disc=d.disc||0;cl=d.cl||{name:'',car:'',plate:''};curId=r.id;curMeta={num:r.num,createdAt:r.createdAt,createdBy:r.createdBy,rec:r};show('calc')}
+async function listView(){$('#view').innerHTML='<div class="card"><h2>Сохранённые сметы</h2><div class="grid" style="grid-template-columns:1fr auto"><input id="lq" type="search" placeholder="Поиск: клиент, авто, номер…" value="'+esc(listQ)+'"><button id="lr">Обновить</button></div><div id="ll" class="mu">Загрузка…</div></div>';
+  $('#lq').oninput=e=>{listQ=e.target.value;drawEst()};$('#lr').onclick=listView;
+  try{const r=await fs('POST',':runQuery',{structuredQuery:{from:[{collectionId:'estimates'}],orderBy:[{field:{fieldPath:'updatedAt'},direction:'DESCENDING'}],limit:300}});EST=r.filter(x=>x.document).map(x=>P(x.document));drawEst()}catch(e){$('#ll').textContent='Не удалось загрузить: '+e.message}}
+function drawEst(){const t=listQ.trim().toLowerCase(),a=EST.filter(r=>!t||(r.num+r.client+r.car+r.plate).toLowerCase().includes(t));
+  $('#ll').className='';$('#ll').innerHTML=a.length?a.map(r=>'<div class="row" style="flex-wrap:wrap"><div class="nm"><b>№ '+esc(r.num)+' · '+fmt(r.total)+'</b><div class="pr">'+esc(r.client||'без имени')+' · '+esc(r.car)+' '+esc(r.plate)+'<br>изм. '+new Date(r.updatedAt).toLocaleString('ru-RU')+' · '+esc(r.updatedBy)+'</div></div><button data-o="'+r.id+'">Открыть</button>'+(isMaster()?'<button data-h="'+r.id+'">История</button><button class="dn" data-d="'+r.id+'">Удалить</button>':'')+'<div id="h-'+r.id+'" style="width:100%"></div></div>').join(''):'<p class="mu">Смет пока нет.</p>';
+  $('#ll').onclick=async e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.o)openEstimate(EST.find(x=>x.id===b.dataset.o));else if(b.dataset.h)showHist(b.dataset.h);else if(b.dataset.d){const r=EST.find(x=>x.id===b.dataset.d);if(confirm('Удалить смету № '+r.num+'? Это нельзя отменить.')){try{await fs('DELETE','/estimates/'+r.id);EST=EST.filter(x=>x.id!==r.id);drawEst();toast('Удалено')}catch(er){toast('Не удалось удалить: '+er.message)}}}}}
+async function showHist(id){const box=$('#h-'+id);box.innerHTML='<p class="mu">Загрузка…</p>';
+  try{const r=await fs('GET','/estimates/'+id+'/history?orderBy='+encodeURIComponent('at desc')+'&pageSize=50'),a=(r.documents||[]).map(P);
+    box.innerHTML=a.length?a.map((h,i)=>'<div class="pr" style="padding:6px 0;border-top:1px dashed var(--ln)">'+new Date(h.at).toLocaleString('ru-RU')+' · '+esc(h.by)+' · '+(h.action==='create'?'создание':'правка')+'<br>'+esc(h.summary)+' <button data-v="'+i+'" style="min-height:30px;padding:2px 8px">Открыть версию</button></div>').join(''):'<p class="mu">Истории нет.</p>';
+    box.onclick=e=>{const b=e.target.closest('[data-v]');if(!b)return;e.stopPropagation();openEstimate({...EST.find(x=>x.id===id),data:a[+b.dataset.v].snapshot})}}catch(e){box.innerHTML='<p class="mu">Не удалось загрузить: '+esc(e.message)+'</p>'}}
+
 /* ---------- Навигация ---------- */
-function show(t){tab=t;$('#t-calc').className=t==='calc'?'on':'';$('#t-admin').className=t==='admin'?'on':'';
-  if(t==='calc'){if(cat&&!cats().includes(cat))cat='';calcShell()}else adminView();
+function show(t){tab=t;['calc','list','admin'].forEach(k=>{const b=$('#t-'+k);if(b)b.className=t===k?'on':''});
+  if(cloudOn()&&!U){loginView();return}
+  if(t==='calc'){if(cat&&!cats().includes(cat))cat='';calcShell()}else if(t==='list')listView();else adminView();
   try{history.replaceState(null,'','#'+t)}catch(e){}}
 $('#t-calc').onclick=()=>show('calc');$('#t-admin').onclick=()=>show('admin');
-load();show(location.hash==='#admin'?'admin':'calc');
+load();boot();
 </script>
 </body>
 </html>
