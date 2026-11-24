@@ -105,7 +105,7 @@ const DEF=[
 ...L('Нормо-часы',[['Слесарные работы (нормо-час)',1500,'час'],['Электрические работы (нормо-час)',1800,'час'],['Кузовные работы (нормо-час)',1800,'час'],['Малярные работы (нормо-час)',2000,'час'],['Диагностические работы (нормо-час)',2000,'час']])
 ].map((x,i)=>({id:'s'+(i+1),...x}));
 const KEY='avtosmeta.v1';
-let aq='',S,sel={},extras=[],disc=0,q='',cat='',admin=false,tab='calc',cl={name:'',car:'',plate:''};
+let sumOpen=false,aq='',S,sel={},extras=[],disc=0,q='',cat='',admin=false,tab='calc',cl={name:'',car:'',plate:''};
 function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
   if(!S||!Array.isArray(S.services))S={pin:'1234',services:DEF.map(x=>({...x}))};
   if(!S.v||S.v<2){const have=new Set(S.services.map(s=>s.name));DEF.forEach(d=>{if(!have.has(d.name))S.services.push({...d})});S.v=2;save()}}
@@ -161,13 +161,15 @@ function totals(){
 }
 function drawSum(){
   const t=totals();
-  $('#sum').innerHTML=`
+  const n=t.lines.length+extras.length;
+  $('#sum').innerHTML=`<div class="tot big" id="sum-head" style="margin:0;border:0;padding:0;cursor:pointer"><span>Итого${n?' ('+n+')':''}</span><span>${fmt(t.total)} <button id="sum-tg" aria-label="Свернуть или развернуть" style="min-height:34px;padding:2px 12px">${sumOpen?'▼':'▲'}</button></span></div><div style="display:${sumOpen?'block':'none'};margin-top:8px">
    <div class="tot"><span>Работы (${t.lines.length})</span><span>${fmt(t.work)}</span></div>
    <div class="tot"><span>Скидка на работы <input id="disc" type="number" min="0" max="100" value="${disc||''}" placeholder="0" style="width:70px;min-height:32px;padding:3px 6px"> %</span><span>−${fmt(t.dv)}</span></div>
    <div class="tot"><span>Запчасти и материалы</span><span>${fmt(t.parts)}</span></div>
-   <div class="tot big"><span>Итого</span><span>${fmt(t.total)}</span></div>
+   
    <div class="btns"><button class="pri" id="b-copy">Скопировать смету</button><button id="b-print">Печать</button><button id="b-clear" class="dn">Очистить</button></div>
-   <div class="btns"><span class="mu">Выгрузить:</span><button id="x-csv">CSV (Excel)</button><button id="x-txt">TXT</button><button id="x-html">HTML</button></div><div class="mu" id="xmsg"></div>`;
+   <div class="btns"><span class="mu">Выгрузить:</span><button id="x-csv">CSV (Excel)</button><button id="x-txt">TXT</button><button id="x-html">HTML</button></div><div class="mu" id="xmsg"></div></div>`;
+  $('#sum-head').onclick=()=>{sumOpen=!sumOpen;drawSum()};
   $('#disc').oninput=e=>{disc=parseFloat(e.target.value)||0;const pos=e.target.selectionStart;drawSum();const i=$('#disc');i.focus();try{i.setSelectionRange(pos,pos)}catch(_){}};
   $('#b-clear').onclick=()=>{if(confirm('Очистить смету?')){sel={};extras=[];disc=0;calcShell()}};
   $('#b-copy').onclick=async()=>{const txt=estimateText();
