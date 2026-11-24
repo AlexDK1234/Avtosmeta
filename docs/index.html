@@ -108,7 +108,7 @@ const KEY='avtosmeta.v1';
 /* Общая база (Firebase). Пока apiKey пуст, программа работает локально, как раньше.
    masters: почты мастеров строчными буквами (для интерфейса; настоящая защита — в правилах Firestore). */
 const CLOUD={apiKey:'AIzaSyCODLzY_y3S9pXkPskhl8Mvs26CL1HwVs4',projectId:'avtosmeta-7ae9e',masters:['sasha-denk@mail.ru'],users:[{name:'Александр',email:'sasha-denk@mail.ru'},{name:'Сергей',email:'sergey@avtosmeta.app'},{name:'Дмитрий',email:'dmitriy@avtosmeta.app'}]};
-let snap={},curId=null,curMeta=null,U=null,listQ='',EST=[],sumOpen=false,aq='',S,sel={},extras=[],disc=0,q='',cat='',admin=false,tab='calc',cl={name:'',car:'',plate:''};
+let GUEST=false,snap={},curId=null,curMeta=null,U=null,listQ='',EST=[],sumOpen=false,aq='',S,sel={},extras=[],disc=0,q='',cat='',admin=false,tab='calc',cl={name:'',car:'',plate:''};
 function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
   if(!S||!Array.isArray(S.services))S={pin:'1234',services:DEF.map(x=>({...x}))};
   if(!S.v||S.v<2){const have=new Set(S.services.map(s=>s.name));DEF.forEach(d=>{if(!have.has(d.name))S.services.push({...d})});S.v=2;save()}}
@@ -170,7 +170,7 @@ function drawSum(){
    <div class="tot"><span>Скидка на работы <input id="disc" type="number" min="0" max="100" value="${disc||''}" placeholder="0" style="width:70px;min-height:32px;padding:3px 6px"> %</span><span>−${fmt(t.dv)}</span></div>
    <div class="tot"><span>Запчасти и материалы</span><span>${fmt(t.parts)}</span></div>
    
-   <div class="btns"><button class="pri" id="b-copy">Скопировать смету</button><button id="b-print">Печать</button><button id="b-clear" class="dn">Очистить</button>${cloudOn()?'<button class="pri" id="b-save">'+(curId?'Сохранить изменения':'Сохранить в базу')+'</button>':''}</div>
+   <div class="btns"><button class="pri" id="b-copy">Скопировать смету</button><button id="b-print">Печать</button><button id="b-clear" class="dn">Очистить</button>${cloudOn()&&U?'<button class="pri" id="b-save">'+(curId?'Сохранить изменения':'Сохранить в базу')+'</button>':''}</div>
    <div class="btns"><span class="mu">Выгрузить:</span><button id="x-csv">CSV (Excel)</button><button id="x-txt">TXT</button><button id="x-html">HTML</button></div><div class="mu" id="xmsg"></div></div>`;
   $('#sum-head').onclick=()=>{sumOpen=!sumOpen;drawSum()};
   if($('#b-save'))$('#b-save').onclick=saveEstimate;
@@ -287,16 +287,25 @@ let _pt,lastPrice=null;
 function priceDiff(a,b){if(!a)return 'Первичная загрузка прайса ('+b.length+' поз.)';const m=new Map(a.map(x=>[x.id,x])),n=new Map(b.map(x=>[x.id,x])),o=[];b.forEach(x=>{const y=m.get(x.id);if(!y)o.push('добавлено: '+x.name+' '+fmt(x.price));else if(y.price!==x.price)o.push(x.name+': '+fmt(y.price)+' → '+fmt(x.price));else if(y.name!==x.name||y.cat!==x.cat||y.unit!==x.unit)o.push('изменено: '+y.name+' → '+x.name)});a.forEach(y=>{if(!n.has(y.id))o.push('удалено: '+y.name)});return o.length?o.slice(0,12).join('; ')+(o.length>12?' и ещё '+(o.length-12):''):''}
 function pushPriceSoon(){clearTimeout(_pt);_pt=setTimeout(async()=>{try{const now=new Date().toISOString(),d=priceDiff(lastPrice,S.services);await fs('PATCH','/config/price',F({services:JSON.stringify(S.services),updatedBy:U.email,updatedAt:now}));if(d)await fs('POST','/priceHistory',F({at:now,by:U.email,summary:d}));lastPrice=JSON.parse(JSON.stringify(S.services))}catch(e){toast('Прайс не сохранён в базе: '+e.message)}},800)}
 async function pullPrice(){try{S.services=JSON.parse(P(await fs('GET','/config/price')).services);lastPrice=JSON.parse(JSON.stringify(S.services));try{localStorage.setItem(KEY,JSON.stringify(S))}catch(_){}}catch(e){if(/NOT_FOUND/.test(e.message))pushPriceSoon()}}
+async function pullPublicPrice(){try{const r=await fetch(FSB()+'/config/price?key='+CLOUD.apiKey);if(r.ok)S.services=JSON.parse(P(await r.json()).services)}catch(e){}}
 async function showPriceHist(){const b=$('#ph');b.innerHTML='<p class="mu">Загрузка…</p>';try{const r=await fs('GET','/priceHistory?orderBy='+encodeURIComponent('at desc')+'&pageSize=50'),a=(r.documents||[]).map(P);b.innerHTML=a.length?a.map(h=>'<div class="pr" style="padding:6px 0;border-top:1px dashed var(--ln)">'+new Date(h.at).toLocaleString('ru-RU')+' · '+esc(nameOf(h.by))+'<br>'+esc(h.summary)+'</div>').join(''):'<p class="mu">Изменений пока нет.</p>'}catch(e){b.innerHTML='<p class="mu">Не удалось загрузить: '+esc(e.message)+'</p>'}}
 let loginUser=0;
 function loginView(){const us=CLOUD.users&&CLOUD.users.length?CLOUD.users:null;
   const pick=us?'<div class="chips" id="l-u">'+us.map((u,i)=>'<button data-i="'+i+'" class="'+(i===loginUser?'on':'')+'">'+esc(u.name)+'</button>').join('')+'</div>':'<input id="l-e" type="email" placeholder="Почта" autocomplete="username">';
-  $('#view').innerHTML='<div class="card"><h2>Вход</h2>'+pick+'<input id="l-p" type="password" placeholder="Пароль" autocomplete="current-password" style="margin-top:8px"><div class="btns"><button class="pri" id="l-go">Войти</button></div><div class="mu" id="l-m"></div></div>';
+  $('#view').innerHTML='<div class="card"><h2>Вход</h2>'+pick+'<input id="l-p" type="password" placeholder="Пароль" autocomplete="current-password" style="margin-top:8px"><div class="btns"><button class="pri" id="l-go">Войти</button><button id="l-guest">Продолжить как гость</button></div><div class="mu" id="l-m"></div></div>';
   if(us)$('#l-u').onclick=e=>{const b=e.target.closest('button');if(!b)return;loginUser=+b.dataset.i;loginView()};
-  const go=async()=>{try{$('#l-m').textContent='Входим…';const email=us?us[loginUser].email:$('#l-e').value.trim();const j=await authCall('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+CLOUD.apiKey,JSON.stringify({email,password:$('#l-p').value,returnSecureToken:true}));U=null;setU(j);await pullPrice();renderWho();show('calc')}catch(e){U=null;$('#l-m').textContent=/CREDENTIALS|PASSWORD|EMAIL|INVALID/.test(e.message)?'Неверный пароль.':'Не удалось войти: '+e.message}};
-  $('#l-go').onclick=go;$('#l-p').onkeydown=e=>{if(e.key==='Enter')go()}}
-function renderWho(){const w=$('#who');if(!cloudOn()||!U){w.style.display='none';return}w.style.display='';w.innerHTML=esc(nameOf(U.email))+' · '+(isMaster()?'администратор':'сотрудник')+' <button id="t-out" style="min-height:30px;padding:2px 10px">Выйти</button>';$('#t-out').onclick=()=>{U=null;try{localStorage.removeItem('avtosmeta.auth')}catch(e){}renderWho();show('calc')}}
-async function boot(){if(cloudOn()){$('#t-list').style.display='';$('#t-list').onclick=()=>show('list');await restore();if(U)await pullPrice()}renderWho();show(location.hash==='#admin'?'admin':'calc')}
+  const go=async()=>{try{$('#l-m').textContent='Входим…';const email=us?us[loginUser].email:$('#l-e').value.trim();const j=await authCall('https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key='+CLOUD.apiKey,JSON.stringify({email,password:$('#l-p').value,returnSecureToken:true}));U=null;setU(j);GUEST=false;try{localStorage.removeItem('avtosmeta.guest')}catch(_){}await pullPrice();renderWho();show('calc')}catch(e){U=null;$('#l-m').textContent=/CREDENTIALS|PASSWORD|EMAIL|INVALID/.test(e.message)?'Неверный пароль.':'Не удалось войти: '+e.message}};
+  $('#l-go').onclick=go;$('#l-p').onkeydown=e=>{if(e.key==='Enter')go()};
+  $('#l-guest').onclick=async()=>{GUEST=true;try{localStorage.setItem('avtosmeta.guest','1')}catch(_){}$('#l-m').textContent='Загружаем прайс…';await pullPublicPrice();renderWho();show('calc')}}
+function renderWho(){const w=$('#who');
+  if($('#t-list'))$('#t-list').style.display=cloudOn()&&U?'':'none';
+  $('#t-admin').style.display=cloudOn()&&!U?'none':'';
+  if(!cloudOn()||(!U&&!GUEST)){w.style.display='none';return}
+  w.style.display='';
+  if(!U){w.innerHTML='Гость · <button id="t-in" style="min-height:30px;padding:2px 10px">Войти</button>';$('#t-in').onclick=()=>{GUEST=false;try{localStorage.removeItem('avtosmeta.guest')}catch(e){}renderWho();show('calc')};return}
+  w.innerHTML=esc(nameOf(U.email))+' · '+(isMaster()?'администратор':'сотрудник')+' <button id="t-out" style="min-height:30px;padding:2px 10px">Выйти</button>';
+  $('#t-out').onclick=()=>{U=null;try{localStorage.removeItem('avtosmeta.auth')}catch(e){}renderWho();show('calc')}}
+async function boot(){if(cloudOn()){$('#t-list').style.display='';$('#t-list').onclick=()=>show('list');await restore();if(U)await pullPrice();else{try{GUEST=localStorage.getItem('avtosmeta.guest')==='1'}catch(_){}if(GUEST)await pullPublicPrice()}}renderWho();show(location.hash==='#admin'?'admin':'calc')}
 function currentLines(){return Object.keys(sel).map(id=>{const s=snap[id]||S.services.find(x=>x.id===id);return s&&{id,n:s.name,k:sel[id],p:s.price,u:s.unit,t:s.price*sel[id]}}).filter(Boolean)}
 const banner=()=>curId?'<div class="card" style="border-color:var(--hi)">Редактируется смета № '+esc(curMeta.num)+' <button onclick="newEstimate()" style="margin-left:8px">Новая смета</button></div>':'';
 function newEstimate(){sel={};snap={};extras=[];disc=0;cl={name:'',car:'',plate:''};curId=null;curMeta=null;calcShell()}
@@ -320,8 +329,8 @@ async function showHist(id){const box=$('#h-'+id);box.innerHTML='<p class="mu">�
     box.onclick=e=>{const b=e.target.closest('[data-v]');if(!b)return;e.stopPropagation();openEstimate({...EST.find(x=>x.id===id),data:a[+b.dataset.v].snapshot})}}catch(e){box.innerHTML='<p class="mu">Не удалось загрузить: '+esc(e.message)+'</p>'}}
 
 /* ---------- Навигация ---------- */
-function show(t){tab=t;['calc','list','admin'].forEach(k=>{const b=$('#t-'+k);if(b)b.className=t===k?'on':''});
-  if(cloudOn()&&!U){loginView();return}
+function show(t){if(cloudOn()&&!U&&GUEST)t='calc';tab=t;['calc','list','admin'].forEach(k=>{const b=$('#t-'+k);if(b)b.className=t===k?'on':''});
+  if(cloudOn()&&!U&&!GUEST){loginView();return}
   if(t==='calc'){if(cat&&!cats().includes(cat))cat='';calcShell()}else if(t==='list')listView();else if(cloudOn())pullPrice().then(adminView);else adminView();
   try{history.replaceState(null,'','#'+t)}catch(e){}}
 $('#t-calc').onclick=()=>show('calc');$('#t-admin').onclick=()=>show('admin');
