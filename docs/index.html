@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>АвтоСмета — расчёт стоимости ремонта</title>
+<style>
+:root{--bg:#eef0f2;--sf:#fff;--ink:#1b2430;--mu:#5d6876;--ln:#d5dae0;--ac:#0f5c63;--acx:#fff;--hi:#f2b01e;--dn:#b3261e;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12171d;--sf:#1b222b;--ink:#e8ecf0;--mu:#9aa6b3;--ln:#2d3743;--ac:#4fb3bc;--acx:#06262a;--dn:#ff8a80;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#12171d;--sf:#1b222b;--ink:#e8ecf0;--mu:#9aa6b3;--ln:#2d3743;--ac:#4fb3bc;--acx:#06262a;--dn:#ff8a80;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:860px;margin:0 auto;padding:12px 14px 40px}
+header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0 12px;border-bottom:3px solid var(--hi);margin-bottom:14px}
+h1{font-size:22px;margin:0;letter-spacing:-.01em}
+h2{font-size:16px;margin:0 0 10px}
+nav{display:flex;gap:6px}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--ln);background:var(--sf);border-radius:8px;padding:8px 12px;min-height:40px}
+button.pri{background:var(--ac);color:var(--acx);border-color:var(--ac);font-weight:600}
+button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button.dn{color:var(--dn)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--ac);outline-offset:1px}
+input,textarea{width:100%;background:var(--sf);border:1px solid var(--ln);border-radius:8px;padding:8px 10px;min-height:40px}
+.card{background:var(--sf);border:1px solid var(--ln);border-radius:10px;padding:14px;margin-bottom:14px}
+.grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:8px 0}
+.chips button{white-space:nowrap;border-radius:999px;padding:6px 12px;min-height:34px}
+.row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--ln)}
+.row:first-child{border-top:0}
+.row .nm{flex:1;min-width:0}
+.row .pr{color:var(--mu);font-size:14px}
+.row.act .nm b{color:var(--ac)}
+.qty{display:flex;align-items:center;gap:4px}
+.qty button{width:38px;padding:0}
+.qty span{min-width:26px;text-align:center;font-variant-numeric:tabular-nums}
+.sum{position:sticky;bottom:0;border:2px solid var(--ac)}
+.tot{display:flex;justify-content:space-between;align-items:baseline;font-size:15px;padding:2px 0}
+.tot.big{font-size:24px;font-weight:700;border-top:2px solid var(--hi);margin-top:6px;padding-top:8px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.mu{color:var(--mu);font-size:14px}
+.arow{display:grid;gap:6px;grid-template-columns:1fr 1fr 90px 70px auto;padding:10px 0;border-top:1px solid var(--ln)}
+.arow .w2{grid-column:span 2}
+@media(max-width:620px){.arow{grid-template-columns:1fr 1fr}.arow .w2{grid-column:span 2}}
+#receipt{display:none}
+@media print{body{background:#fff;color:#000}.wrap>*:not(#receipt){display:none!important}#receipt{display:block}#receipt table{width:100%;border-collapse:collapse}#receipt td,#receipt th{border-bottom:1px solid #999;padding:4px;text-align:left}#receipt td.r,#receipt th.r{text-align:right}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>АвтоСмета</h1>
+  <nav><button id="t-calc" class="on">Расчёт</button><button id="t-admin">Администратор</button></nav>
+</header>
+<main id="view"></main>
+<div id="receipt"></div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(n)+' ₽';
+const D=(cat,name,price,unit)=>({cat,name,price,unit});
+const L=(c,a)=>a.map(([n,p,u])=>D(c,n,p,u||'услуга'));
+const DEF=[
+ D('Техобслуживание','Замена масла и масляного фильтра',1200,'услуга'),
+ D('Техобслуживание','Замена воздушного фильтра',400,'услуга'),
+ D('Техобслуживание','Замена салонного фильтра',400,'услуга'),
+ D('Техобслуживание','Замена свечей зажигания',1000,'комплект'),
+ D('Двигатель','Замена ремня ГРМ с роликами',6500,'услуга'),
+ D('Двигатель','Замена прокладки ГБЦ',14000,'услуга'),
+ D('Двигатель','Компьютерная диагностика',1500,'услуга'),
+ D('Тормоза','Замена колодок (ось)',1800,'ось'),
+ D('Тормоза','Замена тормозных дисков (ось)',2800,'ось'),
+ D('Тормоза','Прокачка тормозной системы',1500,'услуга'),
+ D('Ходовая','Замена амортизатора',2200,'шт'),
+ D('Ходовая','Замена ступичного подшипника',2500,'шт'),
+ D('Ходовая','Развал-схождение',2500,'услуга'),
+ D('Электрика','Замена аккумулятора',500,'услуга'),
+ D('Электрика','Замена генератора',3500,'услуга'),
+ D('Кузов','Покраска элемента',9000,'элемент'),
+ D('Кузов','Удаление вмятин без покраски',3500,'элемент'),
+...L('Техобслуживание',[['ТО-1 (малое: масло, фильтры)',3500],['ТО-2 (расширенное)',7500],['Сезонное ТО перед зимой',2500],['Замена топливного фильтра',900],['Замена охлаждающей жидкости',2000],['Замена тормозной жидкости',1500],['Замена жидкости ГУР',1200],['Замена щёток стеклоочистителя',300,'пара'],['Замена ламп головного света',400,'шт'],['Замена масла в МКПП',1800],['Замена масла в заднем редукторе',1500],['Замена приводного ремня',1200],['Проверка уровней жидкостей и долив',500]]),
+...L('Диагностика',[['Диагностика подвески',900],['Диагностика рулевого управления',800],['Диагностика двигателя (сканер OBD)',1200],['Диагностика АКПП',2500],['Диагностика электрооборудования',2000],['Замер компрессии',1500],['Проверка геометрии кузова',3000],['Предпродажная проверка автомобиля',5000],['Подбор автомобиля (осмотр)',4000],['Считывание и сброс ошибок',600],['Дефектовка двигателя',4500]]),
+...L('Двигатель',[['Замена цепи ГРМ',12000],['Замена помпы',3000],['Замена термостата',1800],['Замена прокладки клапанной крышки',2500],['Замена сальников коленвала',4500],['Замена масляного насоса',6500],['Замена опоры двигателя',2000,'шт'],['Регулировка клапанов',4500],['Капитальный ремонт двигателя',55000],['Снятие и установка двигателя',15000],['Замена поршневых колец',20000],['Замена катушки зажигания',700,'шт'],['Замена форсунок',3500],['Чистка форсунок на стенде',3500],['Чистка дроссельной заслонки',1500],['Замена датчика (общая)',900,'шт'],['Замена натяжителя ремня/цепи',1800],['Замена турбины',12000],['Ремонт турбины',9000],['Чистка клапана EGR',2500],['Замена маслосъёмных колпачков',9000],['Замена поддона картера',3500],['Раскоксовка двигателя',2500]]),
+...L('Дизельные двигатели',[['Замена свечей накала',2500],['Замена ТНВД',9000],['Чистка/замена форсунок дизеля',6000],['Чистка сажевого фильтра (DPF)',7000],['Удаление и замена топливных трубок',3000],['Прокачка дизельной топливной системы',1200]]),
+...L('Трансмиссия',[['Замена сцепления',9000],['Замена выжимного подшипника',1500],['Замена маховика',6000],['Замена масла АКПП',3000],['Замена масла вариатора',3500],['Ремонт АКПП',45000],['Ремонт МКПП',25000],['Ремонт вариатора',50000],['Замена ШРУСа',2800,'шт'],['Замена пыльника ШРУСа',1800,'шт'],['Замена приводного вала',3000,'шт'],['Замена кардана',4500],['Замена крестовины',2500,'шт'],['Замена масла в раздаточной коробке',1800],['Замена сальника коробки',3000],['Ремонт редуктора моста',12000],['Замена гидротрансформатора',14000],['Замена рабочего цилиндра сцепления',2500]]),
+...L('Тормоза',[['Замена задних колодок барабанных',2200,'ось'],['Замена тормозного шланга',1200,'шт'],['Замена суппорта',2500,'шт'],['Ремонт суппорта',2200,'шт'],['Замена главного тормозного цилиндра',3000],['Замена троса ручника',2200],['Замена вакуумного усилителя',4500],['Проточка тормозных дисков',1500,'ось'],['Диагностика ABS',1500],['Замена датчика ABS',1200,'шт'],['Замена тормозных трубок',2500],['Замена колёсного цилиндра',1800,'шт'],['Замена электронного ручника (ЭСП)',3500]]),
+...L('Ходовая',[['Замена пружины',2200,'шт'],['Замена опоры амортизатора',1800,'шт'],['Замена стойки стабилизатора',800,'шт'],['Замена втулок стабилизатора',1200],['Замена сайлентблоков',1500,'шт'],['Замена рычага подвески',2500,'шт'],['Замена шаровой опоры',1800,'шт'],['Замена ступицы',3000,'шт'],['Замена подрамника',9000],['Замена пневмобаллона',5000,'шт'],['Ремонт пневмоподвески',6000],['Замена задней балки',8000],['Замена отбойников и пыльников',1200,'ось'],['Установка проставок/лифт-комплекта',6000]]),
+...L('Рулевое управление',[['Замена рулевой рейки',9000],['Ремонт рулевой рейки',8000],['Замена рулевого наконечника',1200,'шт'],['Замена рулевой тяги',1500,'шт'],['Замена насоса ГУР',3500],['Замена рулевого вала',4000],['Ремонт электроусилителя руля',6000],['Замена шлангов ГУР',2500],['Замена пыльника рулевой рейки',1800,'шт']]),
+...L('Система охлаждения',[['Замена радиатора охлаждения',4500],['Замена вентилятора радиатора',3000],['Замена патрубков',1500,'шт'],['Промывка системы охлаждения',2500],['Замена радиатора печки',5000],['Опрессовка системы охлаждения',1200],['Замена расширительного бачка',1500],['Замена датчика температуры',900],['Замена крышки радиатора',300]]),
+...L('Выхлопная система',[['Замена глушителя',2200],['Замена резонатора',2000],['Замена катализатора',4500],['Замена гофры',2500],['Замена лямбда-зонда',1500,'шт'],['Замена прокладки приёмной трубы',1500],['Сварочные работы по выхлопу',2000],['Замена сажевого фильтра (DPF)',8000],['Замена выпускного коллектора',6000]]),
+...L('Топливная система',[['Замена бензонасоса',3500],['Снятие и установка топливного бака',4500],['Чистка топливного бака',3500],['Замена регулятора давления топлива',2000],['Замена топливных трубок и шлангов',2500],['Промывка топливной системы',2500],['Замена топливной рампы',3500],['Замена датчика уровня топлива',2500]]),
+...L('Кондиционер и отопление',[['Заправка кондиционера',2500],['Диагностика кондиционера',1000],['Поиск утечки фреона',2000],['Замена компрессора кондиционера',6000],['Замена радиатора кондиционера',4500],['Замена осушителя',2500],['Чистка испарителя',3500],['Антибактериальная обработка системы',1800],['Замена моторчика печки',3000],['Замена резистора печки',1500],['Замена салонного вентилятора',3000],['Ремонт климат-контроля',3500]]),
+...L('Электрика',[['Замена стартера',2500],['Ремонт стартера',3000],['Ремонт генератора',3500],['Замена реле/предохранителей',400,'шт'],['Поиск утечки тока',2500],['Ремонт электропроводки',3000,'час'],['Замена блока предохранителей',3000],['Прошивка и адаптация ЭБУ',4000],['Установка сигнализации',5000],['Установка парктроника',4500],['Установка камеры заднего вида',3500],['Установка магнитолы',2500],['Установка видеорегистратора',1500],['Установка светодиодных ламп/ДХО',2500],['Установка подогрева сидений',5000],['Установка автозапуска',6000],['Замена датчика положения коленвала',1500],['Замена аккумулятора (клеммы, чистка)',700],['Проверка и зарядка аккумулятора',500],['Установка усилителя/сабвуфера',5000]]),
+...L('Шиномонтаж',[['Снятие и установка колеса',300,'колесо'],['Монтаж/демонтаж шины R13–R15',300,'колесо'],['Монтаж/демонтаж шины R16–R18',450,'колесо'],['Монтаж/демонтаж шины R19 и больше',700,'колесо'],['Балансировка колеса',300,'колесо'],['Правка диска',1200,'колесо'],['Сезонная смена колёс (комплект)',2400,'комплект'],['Ремонт прокола (жгут/грибок)',500,'колесо'],['Установка датчиков TPMS',800,'шт'],['Сезонное хранение шин',3000,'комплект'],['Накачка колёс азотом',100,'колесо'],['Замена вентиля',150,'шт']]),
+...L('Кузов',[['Покраска бампера',9000,'элемент'],['Покраска капота',12000,'элемент'],['Покраска двери',10000,'элемент'],['Покраска крыла',10000,'элемент'],['Покраска крыши',14000,'элемент'],['Полная покраска кузова',150000],['Локальная покраска (скол, царапина)',3500,'элемент'],['Полировка кузова',8000],['Антикоррозийная обработка днища',9000],['Обработка скрытых полостей',6000],['Рихтовка элемента',5000,'элемент'],['Сварочные работы по кузову',3000,'час'],['Замена крыла',5000,'шт'],['Замена двери',6000,'шт'],['Замена бампера',3500,'шт'],['Замена капота',3500],['Замена порога',9000,'шт'],['Ремонт геометрии на стапеле',15000],['Покраска литого диска',2500,'шт'],['Подбор цвета и колеровка',2500],['Замена молдингов и накладок',1500,'шт'],['Установка противотуманных фар',3500]]),
+...L('Стёкла и оптика',[['Замена лобового стекла',6000],['Замена бокового стекла',3000,'шт'],['Замена заднего стекла',4500],['Ремонт скола/трещины на стекле',2000],['Полировка фар',2500,'пара'],['Замена фары',2000,'шт'],['Замена заднего фонаря',1200,'шт'],['Тонировка стёкол',5000],['Установка стеклоподъёмника',3000,'шт'],['Замена зеркала заднего вида',1500,'шт']]),
+...L('Салон и отделка',[['Химчистка салона',8000],['Перетяжка сиденья',9000,'шт'],['Перетяжка руля',4000],['Замена замка двери',2500,'шт'],['Замена ручки двери',1500,'шт'],['Замена обшивки двери',2500,'шт'],['Ремонт/замена обивки потолка',9000],['Устранение скрипов и вибраций',4000],['Замена ремня безопасности',3500,'шт'],['Ремонт торпедо',6000],['Шумоизоляция салона',25000],['Замена салонного зеркала',1200],['Ремонт центрального замка',3000]]),
+...L('Детейлинг и мойка',[['Мойка кузова',600],['Комплексная мойка',1500],['Мойка двигателя',1500],['Нанесение керамики',20000],['Нанесение полимерного покрытия',8000],['Антидождь на стёкла',1200],['Озонирование салона',2000],['Бронирование плёнкой (PPF), элемент',8000,'элемент'],['Чернение шин и пластика',800]]),
+...L('Дополнительное оборудование',[['Установка фаркопа',5000],['Установка багажника/рейлингов',2500],['Установка защиты картера',1500],['Установка предпускового подогревателя',20000],['Установка ГБО (газ)',35000],['Установка автосигнализации с автозапуском',9000],['Установка подогрева руля',6000],['Установка шумоизоляции арок',6000],['Установка подкрылков',1500,'комплект'],['Установка дефлекторов',1000,'комплект']]),
+...L('Гибриды и электромобили',[['Диагностика высоковольтной батареи',4000],['Замена 12-вольтовой батареи',2500],['Замена высоковольтной батареи',30000],['Замена охлаждающей жидкости тяговой батареи',5000],['Диагностика зарядной системы',3000],['Замена зарядного порта',6000]]),
+...L('Эвакуация и выезд',[['Эвакуатор по городу',3500],['Выезд мастера на место',2000],['Запуск двигателя от внешнего источника',1000],['Вскрытие автомобиля',2500],['Подвоз топлива',1500],['Замена колеса на месте',1200],['Мобильная диагностика',3000]]),
+...L('Нормо-часы',[['Слесарные работы (нормо-час)',1500,'час'],['Электрические работы (нормо-час)',1800,'час'],['Кузовные работы (нормо-час)',1800,'час'],['Малярные работы (нормо-час)',2000,'час'],['Диагностические работы (нормо-час)',2000,'час']])
+].map((x,i)=>({id:'s'+(i+1),...x}));
+const KEY='avtosmeta.v1';
+let aq='',S,sel={},extras=[],disc=0,q='',cat='',admin=false,tab='calc',cl={name:'',car:'',plate:''};
+function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
+  if(!S||!Array.isArray(S.services))S={pin:'1234',services:DEF.map(x=>({...x}))};
+  if(!S.v||S.v<2){const have=new Set(S.services.map(s=>s.name));DEF.forEach(d=>{if(!have.has(d.name))S.services.push({...d})});S.v=2;save()}}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+const cats=()=>[...new Set(S.services.map(s=>s.cat))];
+const uid=()=>'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+
+/* ---------- Калькулятор ---------- */
+function calcShell(){
+  $('#view').innerHTML=`
+  <div class="card"><h2>Клиент и автомобиль</h2><div class="grid">
+    <input id="c-name" placeholder="Имя клиента" value="${esc(cl.name)}">
+    <input id="c-car" placeholder="Марка и модель" value="${esc(cl.car)}">
+    <input id="c-plate" placeholder="Госномер" value="${esc(cl.plate)}"></div></div>
+  <div class="card"><h2>Услуги</h2>
+    <input id="q" type="search" placeholder="Найти услугу…" value="${esc(q)}">
+    <div class="chips" id="chips"></div><div id="list"></div></div>
+  <div class="card"><h2>Запчасти и материалы</h2>
+    <div class="grid" style="grid-template-columns:2fr 1fr 80px auto">
+      <input id="e-n" placeholder="Название"><input id="e-p" type="number" min="0" inputmode="decimal" placeholder="Цена, ₽"><input id="e-q" type="number" min="1" value="1"><button id="e-add" class="pri">Добавить</button></div>
+    <div id="ex"></div></div>
+  <div class="card sum" id="sum"></div>`;
+  ['name','car','plate'].forEach(k=>$('#c-'+k).oninput=e=>cl[k]=e.target.value);
+  $('#q').oninput=e=>{q=e.target.value;drawList()};
+  $('#e-add').onclick=()=>{const n=$('#e-n').value.trim(),p=parseFloat($('#e-p').value),k=parseInt($('#e-q').value)||1;
+    if(!n||isNaN(p)||p<0){alert('Укажите название и цену.');return}
+    extras.push({n,p,k});$('#e-n').value='';$('#e-p').value='';$('#e-q').value=1;drawEx();drawSum()};
+  drawChips();drawList();drawEx();drawSum();
+}
+function drawChips(){
+  $('#chips').innerHTML=['',...cats()].map(c=>`<button data-c="${esc(c)}" class="${c===cat?'on':''}">${c?esc(c):'Все'}</button>`).join('');
+  $('#chips').onclick=e=>{const b=e.target.closest('button');if(!b)return;cat=b.dataset.c;drawChips();drawList()};
+}
+function drawList(){
+  const t=q.trim().toLowerCase();
+  const items=S.services.filter(s=>(!cat||s.cat===cat)&&(!t||(s.name+s.cat).toLowerCase().includes(t)));
+  $('#list').innerHTML=items.length?items.map(s=>{const n=sel[s.id]||0;
+    return `<div class="row ${n?'act':''}"><div class="nm"><b>${esc(s.name)}</b><div class="pr">${esc(s.cat)} · ${fmt(s.price)} / ${esc(s.unit)}</div></div>
+    <div class="qty"><button data-id="${s.id}" data-d="-1" aria-label="Меньше">−</button><span>${n}</span><button data-id="${s.id}" data-d="1" aria-label="Больше">+</button></div></div>`}).join('')
+    :'<p class="mu">Ничего не найдено. Измените запрос или добавьте услугу в разделе «Администратор».</p>';
+  $('#list').onclick=e=>{const b=e.target.closest('button');if(!b)return;
+    const n=Math.max(0,(sel[b.dataset.id]||0)+ +b.dataset.d);if(n)sel[b.dataset.id]=n;else delete sel[b.dataset.id];drawList();drawSum()};
+}
+function drawEx(){
+  $('#ex').innerHTML=extras.map((x,i)=>`<div class="row"><div class="nm">${esc(x.n)}<div class="pr">${x.k} × ${fmt(x.p)}</div></div><b>${fmt(x.p*x.k)}</b><button class="dn" data-i="${i}" aria-label="Удалить">✕</button></div>`).join('');
+  $('#ex').onclick=e=>{const b=e.target.closest('button');if(!b)return;extras.splice(+b.dataset.i,1);drawEx();drawSum()};
+}
+function totals(){
+  const lines=S.services.filter(s=>sel[s.id]).map(s=>({n:s.name,k:sel[s.id],p:s.price,u:s.unit,t:s.price*sel[s.id]}));
+  const work=lines.reduce((a,l)=>a+l.t,0),parts=extras.reduce((a,x)=>a+x.p*x.k,0);
+  const d=Math.min(100,Math.max(0,disc)),dv=work*d/100;
+  return{lines,work,parts,d,dv,total:work-dv+parts};
+}
+function drawSum(){
+  const t=totals();
+  $('#sum').innerHTML=`
+   <div class="tot"><span>Работы (${t.lines.length})</span><span>${fmt(t.work)}</span></div>
+   <div class="tot"><span>Скидка на работы <input id="disc" type="number" min="0" max="100" value="${disc||''}" placeholder="0" style="width:70px;min-height:32px;padding:3px 6px"> %</span><span>−${fmt(t.dv)}</span></div>
+   <div class="tot"><span>Запчасти и материалы</span><span>${fmt(t.parts)}</span></div>
+   <div class="tot big"><span>Итого</span><span>${fmt(t.total)}</span></div>
+   <div class="btns"><button class="pri" id="b-copy">Скопировать смету</button><button id="b-print">Печать</button><button id="b-clear" class="dn">Очистить</button></div>
+   <div class="btns"><span class="mu">Выгрузить:</span><button id="x-csv">CSV (Excel)</button><button id="x-txt">TXT</button><button id="x-html">HTML</button></div><div class="mu" id="xmsg"></div>`;
+  $('#disc').oninput=e=>{disc=parseFloat(e.target.value)||0;const pos=e.target.selectionStart;drawSum();const i=$('#disc');i.focus();try{i.setSelectionRange(pos,pos)}catch(_){}};
+  $('#b-clear').onclick=()=>{if(confirm('Очистить смету?')){sel={};extras=[];disc=0;calcShell()}};
+  $('#b-copy').onclick=async()=>{const txt=estimateText();
+    try{await navigator.clipboard.writeText(txt);$('#b-copy').textContent='Скопировано ✓'}catch(e){prompt('Скопируйте смету:',txt)}};
+  $('#b-print').onclick=()=>{drawReceipt();window.print()};
+  $('#x-csv').onclick=()=>{if(!emptyCheck())exportFile('smeta-'+stamp()+'.csv','text/csv',estimateCSV())};
+  $('#x-txt').onclick=()=>{if(!emptyCheck())exportFile('smeta-'+stamp()+'.txt','text/plain',estimateText())};
+  $('#x-html').onclick=()=>{if(!emptyCheck())exportFile('smeta-'+stamp()+'.html','text/html',receiptHTML())};
+}
+function estimateText(){
+  const t=totals();let s=`Смета на ремонт\nКлиент: ${cl.name||'—'}\nАвто: ${cl.car||'—'} ${cl.plate||''}\n\nРаботы:\n`;
+  t.lines.forEach(l=>s+=`• ${l.n} — ${l.k} × ${fmt(l.p)} = ${fmt(l.t)}\n`);
+  if(t.d)s+=`Скидка ${t.d}%: −${fmt(t.dv)}\n`;
+  if(extras.length){s+='\nЗапчасти и материалы:\n';extras.forEach(x=>s+=`• ${x.n} — ${x.k} × ${fmt(x.p)} = ${fmt(x.p*x.k)}\n`)}
+  return s+`\nИтого: ${fmt(t.total)}`;
+}
+function drawReceipt(){
+  const t=totals(),r=(n,k,p,s)=>`<tr><td>${esc(n)}</td><td class="r">${k}</td><td class="r">${fmt(p)}</td><td class="r">${fmt(s)}</td></tr>`;
+  $('#receipt').innerHTML=`<h1>Смета на ремонт</h1><p>Дата: ${new Date().toLocaleDateString('ru-RU')}<br>Клиент: ${esc(cl.name||'—')}<br>Автомобиль: ${esc(cl.car||'—')} ${esc(cl.plate)}</p>
+  <table><tr><th>Позиция</th><th class="r">Кол-во</th><th class="r">Цена</th><th class="r">Сумма</th></tr>
+  ${t.lines.map(l=>r(l.n,l.k,l.p,l.t)).join('')}${extras.map(x=>r(x.n,x.k,x.p,x.p*x.k)).join('')}</table>
+  ${t.d?`<p>Скидка на работы ${t.d}%: −${fmt(t.dv)}</p>`:''}<h2>Итого: ${fmt(t.total)}</h2>`;
+}
+
+/* ---------- Выгрузка сметы ---------- */
+const stamp=()=>new Date().toISOString().slice(0,10);
+function emptyCheck(){if(!totals().lines.length&&!extras.length){alert('Смета пуста: выберите услуги или добавьте запчасти.');return true}return false}
+function exportFile(name,mime,content){
+  const m=$('#xmsg');
+  try{
+    if(window.AndroidBridge&&AndroidBridge.saveFile){AndroidBridge.saveFile(name,mime,content);return}
+    const u=URL.createObjectURL(new Blob([content],{type:mime+';charset=utf-8'}));
+    const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(u),3000);
+    if(m)m.textContent='Файл «'+name+'» сформирован. Если загрузка не началась, используйте «Скопировать смету».';
+  }catch(e){if(m)m.textContent='Не удалось сохранить файл. Используйте «Скопировать смету».'}
+}
+function estimateCSV(){
+  const t=totals(),q=v=>'"'+String(v).replace(/"/g,'""')+'"',n=v=>String(Math.round(v*100)/100).replace('.',','),r=a=>a.map(q).join(';');
+  const rows=[r(['Смета на ремонт',stamp()]),r(['Клиент',cl.name]),r(['Автомобиль',cl.car,cl.plate]),'',r(['Раздел','Позиция','Кол-во','Ед.','Цена, ₽','Сумма, ₽'])];
+  t.lines.forEach(l=>rows.push(r(['Работа',l.n,l.k,l.u,n(l.p),n(l.t)])));
+  extras.forEach(x=>rows.push(r(['Запчасти',x.n,x.k,'шт',n(x.p),n(x.p*x.k)])));
+  rows.push('',r(['','Работы','','','',n(t.work)]),r(['','Скидка '+t.d+'%','','','',n(-t.dv)]),r(['','Запчасти и материалы','','','',n(t.parts)]),r(['','ИТОГО','','','',n(t.total)]));
+  return '\ufeff'+rows.join('\r\n');
+}
+function receiptHTML(){drawReceipt();return '<!doctype html><html lang="ru"><meta charset="utf-8"><title>Смета</title><style>body{font:15px system-ui,sans-serif;max-width:720px;margin:24px auto;padding:0 14px;color:#111}table{width:100%;border-collapse:collapse}td,th{border-bottom:1px solid #aaa;padding:5px;text-align:left}.r{text-align:right}</style><body>'+$('#receipt').innerHTML+'</body></html>'}
+
+/* ---------- Администрирование ---------- */
+function adminView(){
+  if(!admin){
+    $('#view').innerHTML=`<div class="card"><h2>Вход для администратора</h2>
+      <p class="mu">PIN по умолчанию — 1234. Смените его после первого входа.</p>
+      <input id="pin" type="password" inputmode="numeric" placeholder="PIN" autocomplete="off"><div class="btns"><button class="pri" id="login">Войти</button></div></div>`;
+    const go=()=>{if($('#pin').value===S.pin){admin=true;adminView()}else{alert('Неверный PIN.')}};
+    $('#login').onclick=go;$('#pin').onkeydown=e=>{if(e.key==='Enter')go()};return}
+  $('#view').innerHTML=`
+  <div class="card"><h2>Новая услуга</h2><div class="grid" style="grid-template-columns:1fr 2fr 110px 90px auto">
+    <input id="n-cat" list="cl" placeholder="Категория"><datalist id="cl">${cats().map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+    <input id="n-name" placeholder="Название услуги"><input id="n-price" type="number" min="0" inputmode="decimal" placeholder="Цена, ₽"><input id="n-unit" placeholder="Ед." value="услуга"><button class="pri" id="n-add">Добавить</button></div></div>
+  <div class="card"><h2>Прайс-лист (${S.services.length})</h2><p class="mu">Изменения сохраняются автоматически.</p><input id="aq" type="search" placeholder="Найти в прайсе…" value="${esc(aq)}" style="margin-bottom:8px"><div id="alist"></div></div>
+  <div class="card"><h2>Резервная копия</h2><p class="mu">Скопируйте текст для переноса прайса на другое устройство или вставьте сюда сохранённый ранее.</p>
+    <textarea id="json" rows="4"></textarea><div class="btns"><button id="exp">Показать прайс</button><button id="imp">Загрузить из текста</button><button id="rst" class="dn">Сбросить к стандартному</button></div></div>
+  <div class="card"><h2>Доступ</h2><div class="grid" style="grid-template-columns:1fr auto auto"><input id="newpin" type="password" inputmode="numeric" placeholder="Новый PIN (4+ цифр)"><button id="setpin">Сменить PIN</button><button id="out">Выйти</button></div>
+    <p class="mu">PIN защищает только от случайных правок на этом устройстве, но не заменяет серверную авторизацию.</p></div>`;
+  drawAdminList();
+  $('#aq').oninput=e=>{aq=e.target.value;drawAdminList()};
+  $('#n-add').onclick=()=>{const c=$('#n-cat').value.trim(),n=$('#n-name').value.trim(),p=parseFloat($('#n-price').value),u=$('#n-unit').value.trim()||'услуга';
+    if(!c||!n||isNaN(p)||p<0){alert('Заполните категорию, название и цену.');return}
+    S.services.push({id:uid(),cat:c,name:n,price:p,unit:u});save();adminView()};
+  $('#exp').onclick=()=>$('#json').value=JSON.stringify(S.services,null,1);
+  $('#imp').onclick=()=>{try{const a=JSON.parse($('#json').value);
+      if(!Array.isArray(a)||!a.every(x=>x&&x.name&&x.cat&&typeof x.price==='number'))throw 0;
+      S.services=a.map(x=>({id:x.id||uid(),cat:String(x.cat),name:String(x.name),price:x.price,unit:String(x.unit||'услуга')}));save();sel={};adminView()}
+    catch(e){alert('Не удалось прочитать: нужен список услуг с полями cat, name, price, unit.')}};
+  $('#rst').onclick=()=>{if(confirm('Вернуть стандартный прайс? Ваши изменения будут потеряны.')){S.services=DEF.map(x=>({...x}));sel={};save();adminView()}};
+  $('#setpin').onclick=()=>{const p=$('#newpin').value.trim();if(!/^\d{4,}$/.test(p)){alert('PIN — минимум 4 цифры.');return}S.pin=p;save();$('#newpin').value='';alert('PIN изменён.')};
+  $('#out').onclick=()=>{admin=false;adminView()};
+}
+function drawAdminList(){
+  $('#alist').innerHTML=S.services.filter(s=>!aq.trim()||(s.name+s.cat).toLowerCase().includes(aq.trim().toLowerCase())).map(s=>`<div class="arow" data-id="${s.id}">
+    <input data-f="cat" value="${esc(s.cat)}" aria-label="Категория"><input data-f="name" value="${esc(s.name)}" aria-label="Название">
+    <input data-f="price" type="number" min="0" value="${s.price}" aria-label="Цена"><input data-f="unit" value="${esc(s.unit)}" aria-label="Единица">
+    <button class="dn" data-del="1" aria-label="Удалить">✕</button></div>`).join('');
+  $('#alist').onchange=e=>{const i=e.target,row=i.closest('.arow');if(!row||!i.dataset.f)return;
+    const s=S.services.find(x=>x.id===row.dataset.id);let v=i.value.trim();
+    if(i.dataset.f==='price'){v=parseFloat(v);if(isNaN(v)||v<0){i.value=s.price;return}}
+    else if(!v){i.value=s[i.dataset.f];return}
+    s[i.dataset.f]=v;save()};
+  $('#alist').onclick=e=>{const b=e.target.closest('[data-del]');if(!b)return;const id=b.closest('.arow').dataset.id,s=S.services.find(x=>x.id===id);
+    if(confirm('Удалить «'+s.name+'»?')){S.services=S.services.filter(x=>x.id!==id);delete sel[id];save();adminView()}};
+}
+
+/* ---------- Навигация ---------- */
+function show(t){tab=t;$('#t-calc').className=t==='calc'?'on':'';$('#t-admin').className=t==='admin'?'on':'';
+  if(t==='calc'){if(cat&&!cats().includes(cat))cat='';calcShell()}else adminView();
+  try{history.replaceState(null,'','#'+t)}catch(e){}}
+$('#t-calc').onclick=()=>show('calc');$('#t-admin').onclick=()=>show('admin');
+load();show(location.hash==='#admin'?'admin':'calc');
+</script>
+</body>
+</html>
