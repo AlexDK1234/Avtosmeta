@@ -32,6 +32,8 @@ input,textarea{width:100%;background:var(--sf);border:1px solid var(--ln);border
 .row .nm{flex:1;min-width:0}
 .row .pr{color:var(--mu);font-size:14px}
 .row.act .nm b{color:var(--ac)}
+.row.act{background:color-mix(in srgb,var(--ac) 12%,transparent);border-radius:8px;padding-left:8px;padding-right:8px}
+.grp{padding:8px 0 2px;font-weight:600;font-size:14px;color:var(--mu)}
 .qty{display:flex;align-items:center;gap:4px}
 .qty button{width:38px;padding:0}
 .qty span{min-width:26px;text-align:center;font-variant-numeric:tabular-nums}
@@ -108,7 +110,7 @@ const KEY='avtosmeta.v1';
 /* Общая база (Firebase). Пока apiKey пуст, программа работает локально, как раньше.
    masters: почты мастеров строчными буквами (для интерфейса; настоящая защита — в правилах Firestore). */
 const CLOUD={apiKey:'AIzaSyCODLzY_y3S9pXkPskhl8Mvs26CL1HwVs4',projectId:'avtosmeta-7ae9e',masters:['sasha-denk@mail.ru'],users:[{name:'Александр',email:'sasha-denk@mail.ru'},{name:'Сергей',email:'sergey@avtosmeta.app'},{name:'Дмитрий',email:'dmitriy@avtosmeta.app'}]};
-let GUEST=false,snap={},curId=null,curMeta=null,U=null,listQ='',EST=[],sumOpen=false,aq='',S,sel={},extras=[],disc=0,q='',cat='',admin=false,tab='calc',cl={name:'',car:'',plate:''};
+let curKind=null,listMode='est',GUEST=false,snap={},curId=null,curMeta=null,U=null,listQ='',EST=[],sumOpen=false,aq='',S,sel={},extras=[],disc=0,q='',cat='',admin=false,tab='calc',cl={name:'',car:'',plate:''};
 function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
   if(!S||!Array.isArray(S.services))S={pin:'1234',services:DEF.map(x=>({...x}))};
   if(!S.v||S.v<2){const have=new Set(S.services.map(s=>s.name));DEF.forEach(d=>{if(!have.has(d.name))S.services.push({...d})});S.v=2;save()}}
@@ -131,7 +133,7 @@ function calcShell(){
       <input id="e-n" placeholder="Название"><input id="e-p" type="number" min="0" inputmode="decimal" placeholder="Цена, ₽"><input id="e-q" type="number" min="1" value="1"><button id="e-add" class="pri">Добавить</button></div>
     <div id="ex"></div></div>
   <div class="card sum" id="sum"></div>`;
-  ['name','car','plate'].forEach(k=>$('#c-'+k).oninput=e=>cl[k]=e.target.value);
+  ['name','car','plate'].forEach(k=>$('#c-'+k).oninput=e=>{cl[k]=e.target.value;scheduleDraft()});
   $('#q').oninput=e=>{q=e.target.value;drawList()};
   $('#e-add').onclick=()=>{const n=$('#e-n').value.trim(),p=parseFloat($('#e-p').value),k=parseInt($('#e-q').value)||1;
     if(!n||isNaN(p)||p<0){alert('Укажите название и цену.');return}
@@ -145,9 +147,12 @@ function drawChips(){
 function drawList(){
   const t=q.trim().toLowerCase();
   const items=S.services.filter(s=>(!cat||s.cat===cat)&&(!t||(s.name+s.cat).toLowerCase().includes(t)));
-  $('#list').innerHTML=items.length?items.map(s=>{const n=sel[s.id]||0;
-    return `<div class="row ${n?'act':''}"><div class="nm"><b>${esc(s.name)}</b><div class="pr">${esc(s.cat)} · ${fmt(s.price)} / ${esc(s.unit)}</div></div>
-    <div class="qty"><button data-id="${s.id}" data-d="-1" aria-label="Меньше">−</button><span>${n}</span><button data-id="${s.id}" data-d="1" aria-label="Больше">+</button></div></div>`}).join('')
+  const row=s=>{const n=sel[s.id]||0;
+    return `<div class="row ${n?'act':''}"><div class="nm"><b>${esc(s.name)}</b><div class="pr">${esc(s.cat)} · ${fmt(s.price)} / ${esc(s.unit)}${n?' · '+fmt(s.price*n):''}</div></div>
+    <div class="qty"><button data-id="${s.id}" data-d="-1" aria-label="Меньше">−</button><span>${n}</span><button data-id="${s.id}" data-d="1" aria-label="Больше">+</button></div></div>`};
+  const pick=items.filter(s=>sel[s.id]),rest=items.filter(s=>!sel[s.id]);
+  $('#list').innerHTML=items.length?
+    (pick.length?'<div class="grp">Выбрано ('+pick.length+')</div>'+pick.map(row).join('')+(rest.length?'<div class="grp" style="border-top:2px solid var(--hi);margin-top:8px;padding-top:10px">Остальные услуги</div>':''):'')+rest.map(row).join('')
     :'<p class="mu">Ничего не найдено. Измените запрос или добавьте услугу в разделе «Администратор».</p>';
   $('#list').onclick=e=>{const b=e.target.closest('button');if(!b)return;
     const n=Math.max(0,(sel[b.dataset.id]||0)+ +b.dataset.d);if(n)sel[b.dataset.id]=n;else delete sel[b.dataset.id];drawList();drawSum()};
@@ -163,17 +168,19 @@ function totals(){
   return{lines,work,parts,d,dv,total:work-dv+parts};
 }
 function drawSum(){
+  scheduleDraft();
   const t=totals();
   const n=t.lines.length+extras.length;
-  $('#sum').innerHTML=`<div class="tot big" id="sum-head" style="margin:0;border:0;padding:0;cursor:pointer"><span>Итого${n?' ('+n+')':''}</span><span>${fmt(t.total)} <button id="sum-tg" aria-label="Свернуть или развернуть" style="min-height:34px;padding:2px 12px">${sumOpen?'▼':'▲'}</button></span></div><div style="display:${sumOpen?'block':'none'};margin-top:8px">
+  $('#sum').innerHTML=`<div class="tot big" id="sum-head" style="margin:0;border:0;padding:0;cursor:pointer"><span>Итого${n?' ('+n+')':''}</span><span>${fmt(t.total)} <button id="sum-tg" aria-label="Свернуть или развернуть" style="min-height:34px;padding:2px 12px">${sumOpen?'▼':'▲'}</button></span></div><div class="mu" id="dstat" style="font-size:13px">${dStatus}</div><div style="display:${sumOpen?'block':'none'};margin-top:8px">
    <div class="tot"><span>Работы (${t.lines.length})</span><span>${fmt(t.work)}</span></div>
    <div class="tot"><span>Скидка на работы <input id="disc" type="number" min="0" max="100" value="${disc||''}" placeholder="0" style="width:70px;min-height:32px;padding:3px 6px"> %</span><span>−${fmt(t.dv)}</span></div>
    <div class="tot"><span>Запчасти и материалы</span><span>${fmt(t.parts)}</span></div>
    
-   <div class="btns"><button class="pri" id="b-copy">Скопировать смету</button><button id="b-print">Печать</button><button id="b-clear" class="dn">Очистить</button>${cloudOn()&&U?'<button class="pri" id="b-save">'+(curId?'Сохранить изменения':'Сохранить в базу')+'</button>':''}</div>
+   <div class="btns"><button class="pri" id="b-copy">Скопировать смету</button><button id="b-print">Печать</button><button id="b-clear" class="dn">Очистить</button>${cloudOn()&&U?saveButtons():''}</div>
    <div class="btns"><span class="mu">Выгрузить:</span><button id="x-csv">CSV (Excel)</button><button id="x-txt">TXT</button><button id="x-html">HTML</button></div><div class="mu" id="xmsg"></div></div>`;
   $('#sum-head').onclick=()=>{sumOpen=!sumOpen;drawSum()};
   if($('#b-save'))$('#b-save').onclick=saveEstimate;
+  if($('#b-pub'))$('#b-pub').onclick=publishDraft;
   $('#disc').oninput=e=>{disc=parseFloat(e.target.value)||0;const pos=e.target.selectionStart;drawSum();const i=$('#disc');i.focus();try{i.setSelectionRange(pos,pos)}catch(_){}};
   $('#b-clear').onclick=()=>{if(confirm('Очистить смету?'))newEstimate()};
   $('#b-copy').onclick=async()=>{const txt=estimateText();
@@ -304,29 +311,75 @@ function renderWho(){const w=$('#who');
   w.style.display='';
   if(!U){w.innerHTML='Гость · <button id="t-in" style="min-height:30px;padding:2px 10px">Войти</button>';$('#t-in').onclick=()=>{GUEST=false;try{localStorage.removeItem('avtosmeta.guest')}catch(e){}renderWho();show('calc')};return}
   w.innerHTML=esc(nameOf(U.email))+' · '+(isMaster()?'администратор':'сотрудник')+' <button id="t-out" style="min-height:30px;padding:2px 10px">Выйти</button>';
-  $('#t-out').onclick=()=>{U=null;try{localStorage.removeItem('avtosmeta.auth')}catch(e){}renderWho();show('calc')}}
+  $('#t-out').onclick=async()=>{await flushDraft();resetForm();U=null;try{localStorage.removeItem('avtosmeta.auth')}catch(e){}renderWho();show('calc')}}
 async function boot(){if(cloudOn()){$('#t-list').style.display='';$('#t-list').onclick=()=>show('list');await restore();if(U)await pullPrice();else{try{GUEST=localStorage.getItem('avtosmeta.guest')==='1'}catch(_){}if(GUEST)await pullPublicPrice()}}renderWho();show(location.hash==='#admin'?'admin':'calc')}
 function currentLines(){return Object.keys(sel).map(id=>{const s=snap[id]||S.services.find(x=>x.id===id);return s&&{id,n:s.name,k:sel[id],p:s.price,u:s.unit,t:s.price*sel[id]}}).filter(Boolean)}
-const banner=()=>curId?'<div class="card" style="border-color:var(--hi)">Редактируется смета № '+esc(curMeta.num)+' <button onclick="newEstimate()" style="margin-left:8px">Новая смета</button></div>':'';
-function newEstimate(){sel={};snap={};extras=[];disc=0;cl={name:'',car:'',plate:''};curId=null;curMeta=null;calcShell()}
+const banner=()=>curId?'<div class="card" style="border-color:var(--hi)">'+(curKind==='draft'?'Редактируется черновик':'Редактируется смета')+' № '+esc(curMeta.num)+' <button onclick="newEstimate()" style="margin-left:8px">Новая смета</button></div>':'';
+async function newEstimate(){await flushDraft();resetForm();calcShell()}
 function genNum(){const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+'-'+Math.random().toString(36).slice(2,6).toUpperCase()}
 function summarize(o,n){if(!o)return 'Создана. Итого '+fmt(n.total);const a=JSON.parse(o.data),b=JSON.parse(n.data),nm=d=>Object.keys(d.sel).map(i=>((d.snap||{})[i]||{}).name+' ×'+d.sel[i]),A=nm(a),B=nm(b),add=B.filter(x=>!A.includes(x)),del=A.filter(x=>!B.includes(x));let s='Итого '+fmt(o.total)+' → '+fmt(n.total);if(add.length)s+='; добавлено: '+add.join(', ');if(del.length)s+='; убрано: '+del.join(', ');if(a.disc!==b.disc)s+='; скидка '+a.disc+'% → '+b.disc+'%';if(JSON.stringify(a.extras)!==JSON.stringify(b.extras))s+='; изменены запчасти';if(o.client!==n.client||o.car!==n.car||o.plate!==n.plate)s+='; изменены данные клиента/авто';return s}
 async function saveEstimate(){if(emptyCheck())return;const t=totals(),now=new Date().toISOString(),lines=currentLines(),sn={};lines.forEach(l=>sn[l.id]={name:l.n,price:l.p,unit:l.u});
   const data=JSON.stringify({sel,snap:sn,extras,disc,cl}),isNew=!curId,id=curId||('e'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)),meta=curMeta||{num:genNum(),createdAt:now,createdBy:U.email};
   const rec={num:meta.num,client:cl.name||'',car:cl.car||'',plate:cl.plate||'',total:Math.round(t.total*100)/100,createdAt:meta.createdAt,createdBy:meta.createdBy,updatedAt:now,updatedBy:U.email,data};
   try{await fs('PATCH','/estimates/'+id,F(rec));await fs('POST','/estimates/'+id+'/history',F({at:now,by:U.email,action:isNew?'create':'edit',summary:summarize(isNew?null:curMeta.rec,rec),snapshot:data}));
-    curId=id;curMeta={num:meta.num,createdAt:meta.createdAt,createdBy:meta.createdBy,rec:{...rec,id}};snap=sn;toast('Смета № '+meta.num+' сохранена');calcShell()}catch(e){toast('Не сохранено: '+e.message)}}
-function openEstimate(r){const d=JSON.parse(r.data);sel=d.sel||{};snap=d.snap||{};extras=d.extras||[];disc=d.disc||0;cl=d.cl||{name:'',car:'',plate:''};curId=r.id;curMeta={num:r.num,createdAt:r.createdAt,createdBy:r.createdBy,rec:r};show('calc')}
-async function listView(){$('#view').innerHTML='<div class="card"><h2>Сохранённые сметы</h2><div class="grid" style="grid-template-columns:1fr auto"><input id="lq" type="search" placeholder="Поиск: клиент, авто, номер…" value="'+esc(listQ)+'"><button id="lr">Обновить</button></div><div id="ll" class="mu">Загрузка…</div></div>';
+    curKind='est';curId=id;curMeta={num:meta.num,createdAt:meta.createdAt,createdBy:meta.createdBy,rec:{...rec,id}};snap=sn;toast('Смета № '+meta.num+' сохранена');calcShell()}catch(e){toast('Не сохранено: '+e.message)}}
+async function openEstimate(r,kind){await flushDraft();const d=JSON.parse(r.data);curKind=kind||'est';sel=d.sel||{};snap=d.snap||{};extras=d.extras||[];disc=d.disc||0;cl=d.cl||{name:'',car:'',plate:''};curId=r.id;curMeta={num:r.num,createdAt:r.createdAt,createdBy:r.createdBy,rec:r};lastSig=sigNow();histAt=0;histBase=curKind==='draft'?r:null;setDStat('');show('calc')}
+const ACT={create:'создание',edit:'правка',publish:'публикация',delete:'удаление'};
+const myEmail=()=>String(U.email).toLowerCase();
+const saveButtons=()=>curKind==='est'?'<button class="pri" id="b-save">Сохранить изменения</button>':'<button class="pri" id="b-pub">Сохранить смету</button>';
+function recFor(now,meta){const t=totals(),sn={};currentLines().forEach(l=>sn[l.id]={name:l.n,price:l.p,unit:l.u});const data=JSON.stringify({sel,snap:sn,extras,disc,cl});
+  return{sn,data,rec:{num:meta.num,client:cl.name||'',car:cl.car||'',plate:cl.plate||'',total:Math.round(t.total*100)/100,createdAt:meta.createdAt,createdBy:meta.createdBy,updatedAt:now,updatedBy:U.email,data}}}
+let lastSig=sigNow(),dTimer,dBusy=false,dAgain=false,histAt=0,histBase=null,dStatus='';
+function sigNow(){return JSON.stringify({sel,extras,disc,cl})}
+const hasWork=()=>Object.keys(sel).length||extras.length;
+function setDStat(t){dStatus=t;const e=$('#dstat');if(e)e.textContent=t}
+function resetForm(){sel={};snap={};extras=[];disc=0;cl={name:'',car:'',plate:''};curId=null;curMeta=null;curKind=null;lastSig=sigNow();histAt=0;histBase=null;setDStat('')}
+function scheduleDraft(){if(!cloudOn()||!U||curKind==='est'||sigNow()===lastSig||!hasWork())return;clearTimeout(dTimer);dTimer=setTimeout(autoDraft,2500)}
+async function flushDraft(){clearTimeout(dTimer);while(dBusy)await new Promise(r=>setTimeout(r,150));if(cloudOn()&&U&&curKind!=='est'&&sigNow()!==lastSig&&hasWork())await autoDraft()}
+async function autoDraft(){
+  if(!U||curKind==='est'||sigNow()===lastSig||!hasWork())return;
+  if(dBusy){dAgain=true;return}
+  dBusy=true;setDStat('Сохранение черновика…');
+  try{const sg=sigNow(),now=new Date().toISOString(),isNew=!(curKind==='draft'&&curId),id=isNew?'d'+Date.now().toString(36)+Math.random().toString(36).slice(2,5):curId,
+      meta=isNew?{num:genNum(),createdAt:now,createdBy:U.email}:curMeta,owner=isNew?myEmail():(curMeta.rec.owner||myEmail()),{sn,data,rec}=recFor(now,meta);rec.owner=owner;
+    await fs('PATCH','/drafts/'+id,F(rec));
+    if(isNew||Date.now()-histAt>300000){await fs('POST','/draftHistory',F({draftId:id,num:meta.num,at:now,by:myEmail(),action:isNew?'create':'edit',summary:summarize(isNew?null:histBase,rec),snapshot:data}));histAt=Date.now();histBase={...rec,id}}
+    curKind='draft';curId=id;curMeta={num:meta.num,createdAt:meta.createdAt,createdBy:meta.createdBy,rec:{...rec,id}};snap=sn;lastSig=sg;
+    setDStat('Черновик № '+meta.num+' сохранён в '+new Date().toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}))}
+  catch(e){setDStat('Черновик не сохранён: '+e.message)}
+  dBusy=false;if(dAgain){dAgain=false;scheduleDraft()}}
+async function publishDraft(){if(emptyCheck())return;await flushDraft();
+  const now=new Date().toISOString(),was=curKind==='draft'&&curId,meta=was?curMeta:{num:genNum(),createdAt:now,createdBy:U.email},id='e'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),{sn,data,rec}=recFor(now,meta);
+  try{await fs('PATCH','/estimates/'+id,F(rec));
+    await fs('POST','/estimates/'+id+'/history',F({at:now,by:U.email,action:'create',summary:'Сохранена'+(was?' из черновика':'')+'. Итого '+fmt(rec.total),snapshot:data}));
+    if(was){await fs('POST','/draftHistory',F({draftId:curId,num:meta.num,at:now,by:myEmail(),action:'publish',summary:'Сохранена как смета № '+meta.num,snapshot:data}));await fs('DELETE','/drafts/'+curId)}
+    curKind='est';curId=id;curMeta={num:meta.num,createdAt:meta.createdAt,createdBy:meta.createdBy,rec:{...rec,id}};snap=sn;lastSig=sigNow();setDStat('');toast('Смета № '+meta.num+' сохранена');calcShell()}catch(e){toast('Не сохранено: '+e.message)}}
+async function listView(){const dm=listMode==='draft';
+  $('#view').innerHTML='<div class="card"><h2>'+(dm?'Черновики':'Сохранённые сметы')+'</h2><div class="chips"><button id="m-est" class="'+(dm?'':'on')+'">Сметы</button><button id="m-draft" class="'+(dm?'on':'')+'">Черновики</button>'+(dm&&isMaster()?'<button id="m-log">Журнал правок</button>':'')+'</div><div class="grid" style="grid-template-columns:1fr auto"><input id="lq" type="search" placeholder="Поиск: клиент, авто, номер…" value="'+esc(listQ)+'"><button id="lr">Обновить</button></div><div id="ll" class="mu">Загрузка…</div></div>';
+  $('#m-est').onclick=()=>{listMode='est';listView()};$('#m-draft').onclick=()=>{listMode='draft';listView()};if($('#m-log'))$('#m-log').onclick=showDraftLog;
   $('#lq').oninput=e=>{listQ=e.target.value;drawEst()};$('#lr').onclick=listView;
-  try{const r=await fs('POST',':runQuery',{structuredQuery:{from:[{collectionId:'estimates'}],orderBy:[{field:{fieldPath:'updatedAt'},direction:'DESCENDING'}],limit:300}});EST=r.filter(x=>x.document).map(x=>P(x.document));drawEst()}catch(e){$('#ll').textContent='Не удалось загрузить: '+e.message}}
-function drawEst(){const t=listQ.trim().toLowerCase(),a=EST.filter(r=>!t||(r.num+r.client+r.car+r.plate).toLowerCase().includes(t));
-  $('#ll').className='';$('#ll').innerHTML=a.length?a.map(r=>'<div class="row" style="flex-wrap:wrap"><div class="nm"><b>№ '+esc(r.num)+' · '+fmt(r.total)+'</b><div class="pr">'+esc(r.client||'без имени')+' · '+esc(r.car)+' '+esc(r.plate)+'<br>изм. '+new Date(r.updatedAt).toLocaleString('ru-RU')+' · '+esc(nameOf(r.updatedBy))+'</div></div><button data-o="'+r.id+'">Открыть</button>'+(isMaster()?'<button data-h="'+r.id+'">История</button><button class="dn" data-d="'+r.id+'">Удалить</button>':'')+'<div id="h-'+r.id+'" style="width:100%"></div></div>').join(''):'<p class="mu">Смет пока нет.</p>';
-  $('#ll').onclick=async e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.o)openEstimate(EST.find(x=>x.id===b.dataset.o));else if(b.dataset.h)showHist(b.dataset.h);else if(b.dataset.d){const r=EST.find(x=>x.id===b.dataset.d);if(confirm('Удалить смету № '+r.num+'? Это нельзя отменить.')){try{await fs('DELETE','/estimates/'+r.id);EST=EST.filter(x=>x.id!==r.id);drawEst();toast('Удалено')}catch(er){toast('Не удалось удалить: '+er.message)}}}}}
-async function showHist(id){const box=$('#h-'+id);box.innerHTML='<p class="mu">Загрузка…</p>';
-  try{const r=await fs('GET','/estimates/'+id+'/history?orderBy='+encodeURIComponent('at desc')+'&pageSize=50'),a=(r.documents||[]).map(P);
-    box.innerHTML=a.length?a.map((h,i)=>'<div class="pr" style="padding:6px 0;border-top:1px dashed var(--ln)">'+new Date(h.at).toLocaleString('ru-RU')+' · '+esc(nameOf(h.by))+' · '+(h.action==='create'?'создание':'правка')+'<br>'+esc(h.summary)+' <button data-v="'+i+'" style="min-height:30px;padding:2px 8px">Открыть версию</button></div>').join(''):'<p class="mu">Истории нет.</p>';
-    box.onclick=e=>{const b=e.target.closest('[data-v]');if(!b)return;e.stopPropagation();openEstimate({...EST.find(x=>x.id===id),data:a[+b.dataset.v].snapshot})}}catch(e){box.innerHTML='<p class="mu">Не удалось загрузить: '+esc(e.message)+'</p>'}}
+  try{const byDate=[{field:{fieldPath:'updatedAt'},direction:'DESCENDING'}];
+    const q=!dm?{from:[{collectionId:'estimates'}],orderBy:byDate,limit:300}:isMaster()?{from:[{collectionId:'drafts'}],orderBy:byDate,limit:300}:{from:[{collectionId:'drafts'}],where:{fieldFilter:{field:{fieldPath:'owner'},op:'EQUAL',value:{stringValue:myEmail()}}},limit:300};
+    const r=await fs('POST',':runQuery',{structuredQuery:q});
+    EST=r.filter(x=>x.document).map(x=>P(x.document)).sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));drawEst()}catch(e){$('#ll').textContent='Не удалось загрузить: '+e.message}}
+function drawEst(){const t=listQ.trim().toLowerCase(),dm=listMode==='draft',a=EST.filter(r=>!t||(r.num+r.client+r.car+r.plate).toLowerCase().includes(t));
+  $('#ll').className='';$('#ll').innerHTML=a.length?a.map(r=>'<div class="row" style="flex-wrap:wrap"><div class="nm"><b>№ '+esc(r.num)+' · '+fmt(r.total)+'</b><div class="pr">'+esc(r.client||'без имени')+' · '+esc(r.car)+' '+esc(r.plate)+'<br>изм. '+new Date(r.updatedAt).toLocaleString('ru-RU')+' · '+esc(nameOf(r.updatedBy))+(dm&&isMaster()?'<br>автор: '+esc(nameOf(r.owner)):'')+'</div></div><button data-o="'+r.id+'">Открыть</button>'+(isMaster()?'<button data-h="'+r.id+'">История</button>':'')+(dm||isMaster()?'<button class="dn" data-d="'+r.id+'">Удалить</button>':'')+'<div id="h-'+r.id+'" style="width:100%"></div></div>').join(''):'<p class="mu">'+(dm?'Черновиков нет.':'Смет пока нет.')+'</p>';
+  $('#ll').onclick=async e=>{const b=e.target.closest('button');if(!b)return;
+    if(b.dataset.o)openEstimate(EST.find(x=>x.id===b.dataset.o),dm?'draft':'est');
+    else if(b.dataset.h)showHist(b.dataset.h);
+    else if(b.dataset.d){const r=EST.find(x=>x.id===b.dataset.d);if(confirm('Удалить '+(dm?'черновик':'смету')+' № '+r.num+'? Это нельзя отменить.')){try{
+      if(dm)await fs('POST','/draftHistory',F({draftId:r.id,num:r.num,at:new Date().toISOString(),by:myEmail(),action:'delete',summary:'Черновик удалён. Итого '+fmt(r.total),snapshot:r.data}));
+      await fs('DELETE','/'+(dm?'drafts':'estimates')+'/'+r.id);EST=EST.filter(x=>x.id!==r.id);drawEst();toast('Удалено')}catch(er){toast('Не удалось удалить: '+er.message)}}}}}
+const histRow=h=>'<div class="pr" style="padding:6px 0;border-top:1px dashed var(--ln)">'+(h.num?'<b>№ '+esc(h.num)+'</b> · ':'')+new Date(h.at).toLocaleString('ru-RU')+' · '+esc(nameOf(h.by))+' · '+(ACT[h.action]||h.action)+'<br>'+esc(h.summary);
+async function showHist(id){const box=$('#h-'+id),dm=listMode==='draft';box.innerHTML='<p class="mu">Загрузка…</p>';
+  try{let a;
+    if(dm){const r=await fs('POST',':runQuery',{structuredQuery:{from:[{collectionId:'draftHistory'}],where:{fieldFilter:{field:{fieldPath:'draftId'},op:'EQUAL',value:{stringValue:id}}},limit:100}});a=r.filter(x=>x.document).map(x=>P(x.document)).sort((x,y)=>String(y.at).localeCompare(String(x.at)))}
+    else{const r=await fs('GET','/estimates/'+id+'/history?orderBy='+encodeURIComponent('at desc')+'&pageSize=50');a=(r.documents||[]).map(P)}
+    box.innerHTML=a.length?a.map((h,i)=>histRow(h).replace(/<b>№[^]*?<\/b> · /,'')+' <button data-v="'+i+'" style="min-height:30px;padding:2px 8px">Открыть версию</button></div>').join(''):'<p class="mu">Истории нет.</p>';
+    box.onclick=e=>{const b=e.target.closest('[data-v]');if(!b)return;e.stopPropagation();openEstimate({...EST.find(x=>x.id===id),data:a[+b.dataset.v].snapshot},dm?'draft':'est')}}catch(e){box.innerHTML='<p class="mu">Не удалось загрузить: '+esc(e.message)+'</p>'}}
+async function showDraftLog(){const box=$('#ll');box.className='mu';box.textContent='Загрузка…';
+  try{const r=await fs('POST',':runQuery',{structuredQuery:{from:[{collectionId:'draftHistory'}],orderBy:[{field:{fieldPath:'at'},direction:'DESCENDING'}],limit:100}});const a=r.filter(x=>x.document).map(x=>P(x.document));
+    box.className='';box.innerHTML=a.length?a.map(h=>histRow(h)+'</div>').join(''):'Записей нет.'}catch(e){box.textContent='Не удалось загрузить: '+e.message}}
 
 /* ---------- Навигация ---------- */
 function show(t){if(cloudOn()&&!U&&GUEST)t='calc';tab=t;['calc','list','admin'].forEach(k=>{const b=$('#t-'+k);if(b)b.className=t===k?'on':''});
