@@ -65,6 +65,7 @@ const esc=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'
 const fmt=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(n)+' ₽';
 const D=(cat,name,price,unit)=>({cat,name,price,unit});
 const L=(c,a)=>a.map(([n,p,u])=>D(c,n,p,u||'услуга'));
+const L3=(c,a)=>L(c,a).map(x=>({...x,v:3}));
 const DEF=[
  D('Техобслуживание','Замена масла и масляного фильтра',1200,'услуга'),
  D('Техобслуживание','Замена воздушного фильтра',400,'услуга'),
@@ -104,16 +105,30 @@ const DEF=[
 ...L('Дополнительное оборудование',[['Установка фаркопа',5000],['Установка багажника/рейлингов',2500],['Установка защиты картера',1500],['Установка предпускового подогревателя',20000],['Установка ГБО (газ)',35000],['Установка автосигнализации с автозапуском',9000],['Установка подогрева руля',6000],['Установка шумоизоляции арок',6000],['Установка подкрылков',1500,'комплект'],['Установка дефлекторов',1000,'комплект']]),
 ...L('Гибриды и электромобили',[['Диагностика высоковольтной батареи',4000],['Замена 12-вольтовой батареи',2500],['Замена высоковольтной батареи',30000],['Замена охлаждающей жидкости тяговой батареи',5000],['Диагностика зарядной системы',3000],['Замена зарядного порта',6000]]),
 ...L('Эвакуация и выезд',[['Эвакуатор по городу',3500],['Выезд мастера на место',2000],['Запуск двигателя от внешнего источника',1000],['Вскрытие автомобиля',2500],['Подвоз топлива',1500],['Замена колеса на месте',1200],['Мобильная диагностика',3000]]),
-...L('Нормо-часы',[['Слесарные работы (нормо-час)',1500,'час'],['Электрические работы (нормо-час)',1800,'час'],['Кузовные работы (нормо-час)',1800,'час'],['Малярные работы (нормо-час)',2000,'час'],['Диагностические работы (нормо-час)',2000,'час']])
+...L('Нормо-часы',[['Слесарные работы (нормо-час)',1500,'час'],['Электрические работы (нормо-час)',1800,'час'],['Кузовные работы (нормо-час)',1800,'час'],['Малярные работы (нормо-час)',2000,'час'],['Диагностические работы (нормо-час)',2000,'час']]),
+...L3('Полный привод и раздатка',[['Замена раздаточной коробки',12000],['Ремонт раздаточной коробки',18000],['Снятие и установка раздаточной коробки',7000],['Замена сальников раздаточной коробки',4500],['Замена цепи раздаточной коробки',14000],['Замена подшипников раздаточной коробки',12000],['Замена шестерён раздаточной коробки',15000],['Замена сервопривода раздаточной коробки',5000],['Замена датчика раздаточной коробки',2000],['Замена муфты полного привода (Haldex)',9000],['Замена масла в муфте полного привода',2500],['Замена межосевого дифференциала',12000],['Замена блокировки дифференциала',9000],['Замена переднего редуктора',9000],['Замена заднего редуктора',9000],['Замена масла в переднем редукторе',1800],['Замена подшипников редуктора',8000],['Замена сальников редуктора',3500],['Замена полуоси',3500,'шт'],['Замена подвесного подшипника кардана',3500],['Замена эластичной муфты кардана',3000],['Балансировка кардана',5000],['Замена ступичной муфты (хаба)',3500,'шт'],['Диагностика полного привода',2500]]),
+...L3('Трансмиссия',[['Замена МКПП в сборе',14000],['Замена АКПП в сборе',16000],['Замена вариатора в сборе',18000],['Замена роботизированной КПП в сборе',20000],['Снятие и установка КПП',9000],['Замена гидроблока АКПП',12000],['Замена мехатроника роботизированной КПП',12000],['Замена фрикционов АКПП',30000],['Замена фильтра АКПП',3000],['Замена радиатора АКПП',4500],['Замена масла АКПП (аппаратная)',6000],['Замена масляного насоса АКПП',20000],['Замена блока управления АКПП',4000],['Замена сцепления роботизированной КПП (DSG)',18000],['Замена двухмассового маховика',9000],['Замена диска и корзины сцепления',8000],['Замена вилки выключения сцепления',4000],['Замена троса сцепления',2500],['Прокачка гидропривода сцепления',1200],['Замена кулисы КПП',3500],['Замена тросов выбора передач',3000],['Замена сальника привода КПП',3500],['Замена подшипников первичного вала КПП',18000],['Замена синхронизаторов КПП',22000],['Замена датчика скорости КПП',1800],['Замена датчика положения селектора',2000],['Замена опоры КПП',2000],['Ремонт гидротрансформатора',9000],['Адаптация АКПП',3000],['Замена приводного ремня вариатора',25000]]),
+...L3('Двигатель',[['Замена двигателя (контрактного)',35000],['Замена головки блока цилиндров',20000],['Шлифовка головки блока цилиндров',5000],['Опрессовка ГБЦ',2500],['Замена сальника распредвала',3500],['Замена шкива коленвала',3500],['Замена демпфера коленвала',4500],['Замена распределительного вала',9000],['Замена гидрокомпенсаторов',8000],['Замена маслоохладителя',6000],['Замена прокладки поддона',3500],['Замена прокладки впускного коллектора',5000],['Замена впускного коллектора',6000],['Чистка впускного коллектора',6000],['Замена интеркулера',5000],['Замена патрубков турбины',2500],['Замена актуатора турбины',5000],['Замена вакуумного насоса',6000],['Замена сапуна',2500],['Замена датчика давления масла',1500],['Замена расходомера воздуха',1500],['Замена датчика детонации',2500],['Замена ролика приводного ремня',1800,'шт'],['Замена вискомуфты вентилятора',3500],['Замена фазорегулятора',9000],['Замена клапанов',25000],['Промывка масляной системы',2500],['Замена подушки двигателя',2000,'шт']]),
+...L3('Ходовая',[['Замена опорного подшипника амортизатора',1500,'шт'],['Замена пружин задней подвески',2500],['Замена поперечного рычага задней подвески',3000,'шт'],['Замена продольного рычага',3000,'шт'],['Замена компрессора пневмоподвески',6000],['Замена клапанного блока пневмоподвески',4500],['Замена пневмостойки',5000,'шт'],['Замена колёсных болтов/шпилек',800,'шт'],['Замена пыльников и отбойников',1500,'ось'],['Замена стабилизатора поперечной устойчивости',4500]]),
+...L3('Тормоза',[['Замена колодок стояночного тормоза',2200],['Замена тормозных дисков и колодок (ось)',4200,'ось'],['Замена блока ABS',6000],['Ремонт гидроблока ABS',9000],['Прокачка тормозов сканером (ABS)',2500],['Замена скоб суппорта',1800],['Ремкомплект суппорта',2200,'шт'],['Замена датчика износа колодок',800,'шт']]),
+...L3('Электрика',[['Замена регулятора напряжения',1800],['Замена диодного моста генератора',2500],['Замена бендикса стартера',2200],['Замена втягивающего реле стартера',1800],['Замена замка зажигания',3500],['Изготовление чип-ключа',4500],['Замена блока управления двигателем (ЭБУ)',4000],['Ремонт ЭБУ',6000],['Замена датчика парковки',1200,'шт'],['Замена звукового сигнала',900],['Замена выключателя стоп-сигнала',900],['Замена подрулевых переключателей',2500],['Замена моторчика стеклоочистителя',2500],['Замена моторчика стеклоподъёмника',2500,'шт'],['Замена блока комфорта',3500],['Замена разъёмов и ремонт жгутов',2500]]),
+...L3('Кузов',[['Замена замка капота',2000],['Замена газовых упоров капота/багажника',1200,'шт'],['Замена наружного зеркала',2500,'шт'],['Замена петли двери',2500,'шт'],['Замена лонжерона',15000],['Замена арки',9000],['Замена пола кузова',20000],['Ремонт крышки багажника',6000],['Замена решётки радиатора',1500],['Замена усилителя бампера',3500],['Замена подкрылков',1500,'шт'],['Замена уплотнителей дверей',2500,'шт'],['Удаление ржавчины и локальная сварка',4500,'элемент']]),
+...L3('Кондиционер и отопление',[['Замена шлангов кондиционера',3500],['Замена конденсатора кондиционера',5000],['Замена муфты компрессора кондиционера',3000],['Замена датчика давления кондиционера',1500]]),
+...L3('Топливная система',[['Замена редуктора ГБО',4000],['Замена форсунок ГБО',3500],['Замена топливной магистрали',3500]]),
+...L3('Шиномонтаж',[['Ремонт бокового пореза шины',1500,'шт'],['Замена колёсного диска',500,'шт']]),
+...L3('Диагностика',[['Диагностика трансмиссии',2500],['Проверка работы кондиционера',800]]),
+...L3('Эвакуация и выезд',[['Эвакуатор за город',70,'км']])
 ].map((x,i)=>({id:'s'+(i+1),...x}));
 const KEY='avtosmeta.v1';
+const DEFV=3;
 /* Общая база (Firebase). Пока apiKey пуст, программа работает локально, как раньше.
    masters: почты мастеров строчными буквами (для интерфейса; настоящая защита — в правилах Firestore). */
 const CLOUD={apiKey:'AIzaSyCODLzY_y3S9pXkPskhl8Mvs26CL1HwVs4',projectId:'avtosmeta-7ae9e',masters:['sasha-denk@mail.ru'],users:[{name:'Александр',email:'sasha-denk@mail.ru'},{name:'Сергей',email:'sergey@avtosmeta.app'},{name:'Дмитрий',email:'dmitriy@avtosmeta.app'}]};
 let curKind=null,listMode='est',GUEST=false,snap={},curId=null,curMeta=null,U=null,listQ='',EST=[],sumOpen=false,aq='',S,sel={},extras=[],disc=0,q='',cat='',admin=false,tab='calc',cl={name:'',car:'',plate:''};
 function load(){try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){S=null}
   if(!S||!Array.isArray(S.services))S={pin:'1234',services:DEF.map(x=>({...x}))};
-  if(!S.v||S.v<2){const have=new Set(S.services.map(s=>s.name));DEF.forEach(d=>{if(!have.has(d.name))S.services.push({...d})});S.v=2;save()}}
+  if((S.v||0)<DEFV){mergeDefaults(S.v||0);S.v=DEFV;save()}}
+function mergeDefaults(fromV){const names=new Set(S.services.map(x=>x.name)),ids=new Set(S.services.map(x=>x.id));let n=0;DEF.forEach(d=>{if((fromV<2||(d.v||2)>fromV)&&!names.has(d.name)&&!ids.has(d.id)){S.services.push({...d});n++}});return n}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}if(cloudOn()&&U)pushPriceSoon()}
 const cats=()=>[...new Set(S.services.map(s=>s.cat))];
 const uid=()=>'s'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
@@ -144,18 +159,21 @@ function drawChips(){
   $('#chips').innerHTML=['',...cats()].map(c=>`<button data-c="${esc(c)}" class="${c===cat?'on':''}">${c?esc(c):'Все'}</button>`).join('');
   $('#chips').onclick=e=>{const b=e.target.closest('button');if(!b)return;cat=b.dataset.c;drawChips();drawList()};
 }
+const normS=t=>String(t).toLowerCase().replace(/ё/g,'е');
+const matchQ=(q,s)=>{const w=normS(q).split(/\s+/).filter(Boolean).map(x=>x.length>5?x.slice(0,-2):x);if(!w.length)return true;const h=normS(s.name+' '+s.cat);return w.every(x=>h.includes(x))};
+function updChips(){document.querySelectorAll('#chips button').forEach(b=>{const c=b.dataset.c,n=S.services.filter(s=>sel[s.id]&&(!c||s.cat===c)).length;b.textContent=(c||'Все')+(n?' · '+n:'')})}
+function groupRows(a,row){if(cat)return a.map(row).join('');const g=new Map();a.forEach(s=>{if(!g.has(s.cat))g.set(s.cat,[]);g.get(s.cat).push(s)});return[...g].map(([c,l])=>'<div class="grp" style="padding-top:12px">'+esc(c)+' · '+l.length+'</div>'+l.map(row).join('')).join('')}
 function drawList(){
-  const t=q.trim().toLowerCase();
-  const items=S.services.filter(s=>(!cat||s.cat===cat)&&(!t||(s.name+s.cat).toLowerCase().includes(t)));
-  const row=s=>{const n=sel[s.id]||0;
+  const items=S.services.filter(s=>(!cat||s.cat===cat)&&matchQ(q,s));
+  const row=s=>{const n=sel[s.id]||0,st=s.unit==='час'?0.5:1;
     return `<div class="row ${n?'act':''}"><div class="nm"><b>${esc(s.name)}</b><div class="pr">${esc(s.cat)} · ${fmt(s.price)} / ${esc(s.unit)}${n?' · '+fmt(s.price*n):''}</div></div>
-    <div class="qty"><button data-id="${s.id}" data-d="-1" aria-label="Меньше">−</button><span>${n}</span><button data-id="${s.id}" data-d="1" aria-label="Больше">+</button></div></div>`};
+    <div class="qty"><button data-id="${s.id}" data-d="${-st}" aria-label="Меньше">−</button><span>${n}</span><button data-id="${s.id}" data-d="${st}" aria-label="Больше">+</button></div></div>`};
   const pick=items.filter(s=>sel[s.id]),rest=items.filter(s=>!sel[s.id]);
   $('#list').innerHTML=items.length?
-    (pick.length?'<div class="grp">Выбрано ('+pick.length+')</div>'+pick.map(row).join('')+(rest.length?'<div class="grp" style="border-top:2px solid var(--hi);margin-top:8px;padding-top:10px">Остальные услуги</div>':''):'')+rest.map(row).join('')
+    (pick.length?'<div class="grp">Выбрано ('+pick.length+')</div>'+pick.map(row).join('')+(rest.length?'<div class="grp" style="border-top:2px solid var(--hi);margin-top:8px;padding-top:10px">Остальные услуги</div>':''):'')+groupRows(rest,row)
     :'<p class="mu">Ничего не найдено. Измените запрос или добавьте услугу в разделе «Администратор».</p>';
   $('#list').onclick=e=>{const b=e.target.closest('button');if(!b)return;
-    const n=Math.max(0,(sel[b.dataset.id]||0)+ +b.dataset.d);if(n)sel[b.dataset.id]=n;else delete sel[b.dataset.id];drawList();drawSum()};
+    const n=Math.max(0,Math.round(((sel[b.dataset.id]||0)+ +b.dataset.d)*100)/100);if(n)sel[b.dataset.id]=n;else delete sel[b.dataset.id];drawList();drawSum()};
 }
 function drawEx(){
   $('#ex').innerHTML=extras.map((x,i)=>`<div class="row"><div class="nm">${esc(x.n)}<div class="pr">${x.k} × ${fmt(x.p)}</div></div><b>${fmt(x.p*x.k)}</b><button class="dn" data-i="${i}" aria-label="Удалить">✕</button></div>`).join('');
@@ -168,7 +186,7 @@ function totals(){
   return{lines,work,parts,d,dv,total:work-dv+parts};
 }
 function drawSum(){
-  scheduleDraft();
+  updChips();scheduleDraft();
   const t=totals();
   const n=t.lines.length+extras.length;
   $('#sum').innerHTML=`<div class="tot big" id="sum-head" style="margin:0;border:0;padding:0;cursor:pointer"><span>Итого${n?' ('+n+')':''}</span><span>${fmt(t.total)} <button id="sum-tg" aria-label="Свернуть или развернуть" style="min-height:34px;padding:2px 12px">${sumOpen?'▼':'▲'}</button></span></div><div class="mu" id="dstat" style="font-size:13px">${dStatus}</div><div style="display:${sumOpen?'block':'none'};margin-top:8px">
@@ -221,7 +239,7 @@ function exportFile(name,mime,content){
 function estimateCSV(){
   const t=totals(),q=v=>'"'+String(v).replace(/"/g,'""')+'"',n=v=>String(Math.round(v*100)/100).replace('.',','),r=a=>a.map(q).join(';');
   const rows=[r(['Смета на ремонт',stamp()]),r(['Клиент',cl.name]),r(['Автомобиль',cl.car,cl.plate]),'',r(['Раздел','Позиция','Кол-во','Ед.','Цена, ₽','Сумма, ₽'])];
-  t.lines.forEach(l=>rows.push(r(['Работа',l.n,l.k,l.u,n(l.p),n(l.t)])));
+  t.lines.forEach(l=>rows.push(r(['Работа',l.n,n(l.k),l.u,n(l.p),n(l.t)])));
   extras.forEach(x=>rows.push(r(['Запчасти',x.n,x.k,'шт',n(x.p),n(x.p*x.k)])));
   rows.push('',r(['','Работы','','','',n(t.work)]),r(['','Скидка '+t.d+'%','','','',n(-t.dv)]),r(['','Запчасти и материалы','','','',n(t.parts)]),r(['','ИТОГО','','','',n(t.total)]));
   return '\ufeff'+rows.join('\r\n');
@@ -263,7 +281,7 @@ function adminView(){
     if(isMaster()){const c=document.createElement('div');c.className='card';c.innerHTML='<h2>История изменений прайса</h2><div class="btns"><button id="ph-b">Показать</button></div><div id="ph"></div>';$('#view').appendChild(c);$('#ph-b').onclick=showPriceHist}}
 }
 function drawAdminList(){
-  $('#alist').innerHTML=S.services.filter(s=>!aq.trim()||(s.name+s.cat).toLowerCase().includes(aq.trim().toLowerCase())).map(s=>`<div class="arow" data-id="${s.id}">
+  $('#alist').innerHTML=S.services.filter(s=>matchQ(aq,s)).map(s=>`<div class="arow" data-id="${s.id}">
     <input data-f="cat" value="${esc(s.cat)}" aria-label="Категория"><input data-f="name" value="${esc(s.name)}" aria-label="Название">
     <input data-f="price" type="number" min="0" value="${s.price}" aria-label="Цена"><input data-f="unit" value="${esc(s.unit)}" aria-label="Единица">
     <button class="dn" data-del="1" aria-label="Удалить">✕</button></div>`).join('');
@@ -292,9 +310,9 @@ async function tok(){if(!U)throw new Error('Нет входа');if(Date.now()>U.
 async function fs(method,path,body){const t=await tok();const r=await fetch(FSB()+path,{method,headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error?(e.error.status+': '+e.error.message):String(r.status))}return r.json()}
 let _pt,lastPrice=null;
 function priceDiff(a,b){if(!a)return 'Первичная загрузка прайса ('+b.length+' поз.)';const m=new Map(a.map(x=>[x.id,x])),n=new Map(b.map(x=>[x.id,x])),o=[];b.forEach(x=>{const y=m.get(x.id);if(!y)o.push('добавлено: '+x.name+' '+fmt(x.price));else if(y.price!==x.price)o.push(x.name+': '+fmt(y.price)+' → '+fmt(x.price));else if(y.name!==x.name||y.cat!==x.cat||y.unit!==x.unit)o.push('изменено: '+y.name+' → '+x.name)});a.forEach(y=>{if(!n.has(y.id))o.push('удалено: '+y.name)});return o.length?o.slice(0,12).join('; ')+(o.length>12?' и ещё '+(o.length-12):''):''}
-function pushPriceSoon(){clearTimeout(_pt);_pt=setTimeout(async()=>{try{const now=new Date().toISOString(),d=priceDiff(lastPrice,S.services);await fs('PATCH','/config/price',F({services:JSON.stringify(S.services),updatedBy:U.email,updatedAt:now}));if(d)await fs('POST','/priceHistory',F({at:now,by:U.email,summary:d}));lastPrice=JSON.parse(JSON.stringify(S.services))}catch(e){toast('Прайс не сохранён в базе: '+e.message)}},800)}
-async function pullPrice(){try{S.services=JSON.parse(P(await fs('GET','/config/price')).services);lastPrice=JSON.parse(JSON.stringify(S.services));try{localStorage.setItem(KEY,JSON.stringify(S))}catch(_){}}catch(e){if(/NOT_FOUND/.test(e.message))pushPriceSoon()}}
-async function pullPublicPrice(){try{const r=await fetch(FSB()+'/config/price?key='+CLOUD.apiKey);if(r.ok)S.services=JSON.parse(P(await r.json()).services)}catch(e){}}
+function pushPriceSoon(){clearTimeout(_pt);_pt=setTimeout(async()=>{try{const now=new Date().toISOString(),d=priceDiff(lastPrice,S.services);await fs('PATCH','/config/price',F({services:JSON.stringify(S.services),updatedBy:U.email,updatedAt:now,defV:DEFV}));if(d)await fs('POST','/priceHistory',F({at:now,by:U.email,summary:d}));lastPrice=JSON.parse(JSON.stringify(S.services))}catch(e){toast('Прайс не сохранён в базе: '+e.message)}},800)}
+async function pullPrice(){try{const p=P(await fs('GET','/config/price'));S.services=JSON.parse(p.services);lastPrice=JSON.parse(JSON.stringify(S.services));if((p.defV||2)<DEFV){mergeDefaults(p.defV||2);pushPriceSoon()}try{localStorage.setItem(KEY,JSON.stringify(S))}catch(_){}}catch(e){if(/NOT_FOUND/.test(e.message))pushPriceSoon()}}
+async function pullPublicPrice(){try{const r=await fetch(FSB()+'/config/price?key='+CLOUD.apiKey);if(r.ok){const p=P(await r.json());S.services=JSON.parse(p.services);mergeDefaults(p.defV||2)}}catch(e){}}
 async function showPriceHist(){const b=$('#ph');b.innerHTML='<p class="mu">Загрузка…</p>';try{const r=await fs('GET','/priceHistory?orderBy='+encodeURIComponent('at desc')+'&pageSize=50'),a=(r.documents||[]).map(P);b.innerHTML=a.length?a.map(h=>'<div class="pr" style="padding:6px 0;border-top:1px dashed var(--ln)">'+new Date(h.at).toLocaleString('ru-RU')+' · '+esc(nameOf(h.by))+'<br>'+esc(h.summary)+'</div>').join(''):'<p class="mu">Изменений пока нет.</p>'}catch(e){b.innerHTML='<p class="mu">Не удалось загрузить: '+esc(e.message)+'</p>'}}
 let loginUser=0;
 function loginView(){const us=CLOUD.users&&CLOUD.users.length?CLOUD.users:null;
@@ -354,6 +372,7 @@ async function publishDraft(){if(emptyCheck())return;await flushDraft();
     await fs('POST','/estimates/'+id+'/history',F({at:now,by:U.email,action:'create',summary:'Сохранена'+(was?' из черновика':'')+'. Итого '+fmt(rec.total),snapshot:data}));
     if(was){await fs('POST','/draftHistory',F({draftId:curId,num:meta.num,at:now,by:myEmail(),action:'publish',summary:'Сохранена как смета № '+meta.num,snapshot:data}));await fs('DELETE','/drafts/'+curId)}
     curKind='est';curId=id;curMeta={num:meta.num,createdAt:meta.createdAt,createdBy:meta.createdBy,rec:{...rec,id}};snap=sn;lastSig=sigNow();setDStat('');toast('Смета № '+meta.num+' сохранена');calcShell()}catch(e){toast('Не сохранено: '+e.message)}}
+async function copyEstimate(r){await flushDraft();const d=JSON.parse(r.data);sel=d.sel||{};snap={};extras=d.extras||[];disc=d.disc||0;cl=d.cl||{name:'',car:'',plate:''};curId=null;curMeta=null;curKind=null;lastSig='';histAt=0;histBase=null;setDStat('');show('calc');toast('Создана копия, она сохраняется в черновик')}
 async function listView(){const dm=listMode==='draft';
   $('#view').innerHTML='<div class="card"><h2>'+(dm?'Черновики':'Сохранённые сметы')+'</h2><div class="chips"><button id="m-est" class="'+(dm?'':'on')+'">Сметы</button><button id="m-draft" class="'+(dm?'on':'')+'">Черновики</button>'+(dm&&isMaster()?'<button id="m-log">Журнал правок</button>':'')+'</div><div class="grid" style="grid-template-columns:1fr auto"><input id="lq" type="search" placeholder="Поиск: клиент, авто, номер…" value="'+esc(listQ)+'"><button id="lr">Обновить</button></div><div id="ll" class="mu">Загрузка…</div></div>';
   $('#m-est').onclick=()=>{listMode='est';listView()};$('#m-draft').onclick=()=>{listMode='draft';listView()};if($('#m-log'))$('#m-log').onclick=showDraftLog;
@@ -363,9 +382,9 @@ async function listView(){const dm=listMode==='draft';
     const r=await fs('POST',':runQuery',{structuredQuery:q});
     EST=r.filter(x=>x.document).map(x=>P(x.document)).sort((a,b)=>String(b.updatedAt).localeCompare(String(a.updatedAt)));drawEst()}catch(e){$('#ll').textContent='Не удалось загрузить: '+e.message}}
 function drawEst(){const t=listQ.trim().toLowerCase(),dm=listMode==='draft',a=EST.filter(r=>!t||(r.num+r.client+r.car+r.plate).toLowerCase().includes(t));
-  $('#ll').className='';$('#ll').innerHTML=a.length?a.map(r=>'<div class="row" style="flex-wrap:wrap"><div class="nm"><b>№ '+esc(r.num)+' · '+fmt(r.total)+'</b><div class="pr">'+esc(r.client||'без имени')+' · '+esc(r.car)+' '+esc(r.plate)+'<br>изм. '+new Date(r.updatedAt).toLocaleString('ru-RU')+' · '+esc(nameOf(r.updatedBy))+(dm&&isMaster()?'<br>автор: '+esc(nameOf(r.owner)):'')+'</div></div><button data-o="'+r.id+'">Открыть</button>'+(isMaster()?'<button data-h="'+r.id+'">История</button>':'')+(dm||isMaster()?'<button class="dn" data-d="'+r.id+'">Удалить</button>':'')+'<div id="h-'+r.id+'" style="width:100%"></div></div>').join(''):'<p class="mu">'+(dm?'Черновиков нет.':'Смет пока нет.')+'</p>';
+  $('#ll').className='';$('#ll').innerHTML=a.length?a.map(r=>'<div class="row" style="flex-wrap:wrap"><div class="nm"><b>№ '+esc(r.num)+' · '+fmt(r.total)+'</b><div class="pr">'+esc(r.client||'без имени')+' · '+esc(r.car)+' '+esc(r.plate)+'<br>изм. '+new Date(r.updatedAt).toLocaleString('ru-RU')+' · '+esc(nameOf(r.updatedBy))+(dm&&isMaster()?'<br>автор: '+esc(nameOf(r.owner)):'')+'</div></div><button data-o="'+r.id+'">Открыть</button><button data-c="'+r.id+'">Копия</button>'+(isMaster()?'<button data-h="'+r.id+'">История</button>':'')+(dm||isMaster()?'<button class="dn" data-d="'+r.id+'">Удалить</button>':'')+'<div id="h-'+r.id+'" style="width:100%"></div></div>').join(''):'<p class="mu">'+(dm?'Черновиков нет.':'Смет пока нет.')+'</p>';
   $('#ll').onclick=async e=>{const b=e.target.closest('button');if(!b)return;
-    if(b.dataset.o)openEstimate(EST.find(x=>x.id===b.dataset.o),dm?'draft':'est');
+    if(b.dataset.c)copyEstimate(EST.find(x=>x.id===b.dataset.c));else if(b.dataset.o)openEstimate(EST.find(x=>x.id===b.dataset.o),dm?'draft':'est');
     else if(b.dataset.h)showHist(b.dataset.h);
     else if(b.dataset.d){const r=EST.find(x=>x.id===b.dataset.d);if(confirm('Удалить '+(dm?'черновик':'смету')+' № '+r.num+'? Это нельзя отменить.')){try{
       if(dm)await fs('POST','/draftHistory',F({draftId:r.id,num:r.num,at:new Date().toISOString(),by:myEmail(),action:'delete',summary:'Черновик удалён. Итого '+fmt(r.total),snapshot:r.data}));
